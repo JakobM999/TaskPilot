@@ -294,15 +294,6 @@ function Dashboard({ user, onLogout }) {
       default:
         return (
           <Box sx={{ p: 3 }}>
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="h4" component="h1" gutterBottom>
-                Welcome, {user?.user_metadata?.full_name || user?.email || 'User'}
-              </Typography>
-              <Typography variant="body1" color="text.secondary" gutterBottom>
-                Here's an overview of your tasks and upcoming calendar events
-              </Typography>
-            </Box>
-
             <Grid container spacing={3}>
               <Grid item xs={12} md={7} lg={8}>
                 <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
@@ -362,7 +353,10 @@ function Dashboard({ user, onLogout }) {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             {format(new Date(), 'EEEE, d. MMMM yyyy', { locale: da })}
           </Typography>
-          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="subtitle1" sx={{ display: { xs: 'none', sm: 'block' } }}>
+              Welcome, {user?.user_metadata?.full_name || user?.email || 'User'}
+            </Typography>
             <Button color="inherit" onClick={handleSignOut} startIcon={<LogoutIcon />}>
               Sign Out
             </Button>
