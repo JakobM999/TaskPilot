@@ -22,12 +22,72 @@ let mockTasks = [
 
 // Get tasks based on timeframe
 export const getTasks = async (timeframe = 'today') => {
-  // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 800));
   
   try {
-    // In a real implementation, this would filter based on the timeframe
-    return { data: mockTasks, error: null };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get overdue tasks (past tasks that are not completed)
+    const overdueTasks = mockTasks.filter(task => {
+      const taskDate = new Date(task.dueDate);
+      taskDate.setHours(0, 0, 0, 0);
+      return !task.completed && taskDate < today;
+    });
+
+    let timeframeTasks = [];
+    if (timeframe === 'today') {
+      // Get today's tasks
+      timeframeTasks = mockTasks.filter(task => {
+        const taskDate = new Date(task.dueDate);
+        taskDate.setHours(0, 0, 0, 0);
+        return taskDate.getTime() === today.getTime();
+      });
+    } else if (timeframe === 'tomorrow') {
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      timeframeTasks = mockTasks.filter(task => {
+        const taskDate = new Date(task.dueDate);
+        taskDate.setHours(0, 0, 0, 0);
+        return taskDate.getTime() === tomorrow.getTime();
+      });
+    } else if (timeframe === 'week') {
+      const weekEnd = new Date(today);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      weekEnd.setHours(23, 59, 59, 999);
+      timeframeTasks = mockTasks.filter(task => {
+        const taskDate = new Date(task.dueDate);
+        return taskDate >= today && taskDate <= weekEnd;
+      });
+    } else if (timeframe === 'month') {
+      const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      monthEnd.setHours(23, 59, 59, 999);
+      timeframeTasks = mockTasks.filter(task => {
+        const taskDate = new Date(task.dueDate);
+        return taskDate >= today && taskDate <= monthEnd;
+      });
+    } else if (timeframe === 'upcoming') {
+      timeframeTasks = mockTasks.filter(task => {
+        const taskDate = new Date(task.dueDate);
+        taskDate.setHours(0, 0, 0, 0);
+        return !task.completed && taskDate > today;
+      });
+    } else if (timeframe === 'overdue') {
+      timeframeTasks = overdueTasks;
+    } else {
+      timeframeTasks = mockTasks;
+    }
+
+    // For any timeframe other than 'overdue', combine overdue tasks with timeframe tasks
+    // and remove duplicates
+    if (timeframe !== 'overdue') {
+      const allTasks = [...overdueTasks, ...timeframeTasks];
+      // Remove duplicates based on task ID
+      const uniqueTasks = Array.from(new Map(allTasks.map(task => [task.id, task])).values());
+      return { data: uniqueTasks, error: null };
+    }
+
+    return { data: timeframeTasks, error: null };
   } catch (error) {
     console.error('Error fetching tasks:', error);
     return { data: null, error };
@@ -111,9 +171,12 @@ export const rescheduleTask = async (taskId) => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     
+    // Format date as YYYY-MM-DD for storage
+    const formattedDate = tomorrow.toISOString().split('T')[0];
+    
     const updatedTask = {
       ...task,
-      dueDate: tomorrow.toISOString().split('T')[0],
+      dueDate: formattedDate,
       escalated: true
     };
     mockTasks = mockTasks.map(t => t.id === taskId ? updatedTask : t);

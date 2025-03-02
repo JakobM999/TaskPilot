@@ -141,6 +141,42 @@ function TaskList({
     onTimeframeChange(newTimeframe);
   };
 
+  const sortTasks = (tasks) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Split tasks into three categories: overdue, timeframe tasks, and completed
+    const overdueTasks = [];
+    const timeframeTasks = [];
+    const completedTasks = [];
+
+    tasks.forEach(task => {
+      if (task.completed) {
+        completedTasks.push(task);
+        return;
+      }
+
+      const taskDate = new Date(task.dueDate);
+      taskDate.setHours(0, 0, 0, 0);
+      
+      if (taskDate < today) {
+        overdueTasks.push(task);
+      } else {
+        timeframeTasks.push(task);
+      }
+    });
+
+    // Sort overdue tasks by due date (oldest first)
+    overdueTasks.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+    // Sort timeframe tasks by due date
+    timeframeTasks.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+    // Sort completed tasks by due date (most recent first)
+    completedTasks.sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate));
+
+    // Combine all tasks with overdue tasks first
+    return [...overdueTasks, ...timeframeTasks, ...completedTasks];
+  };
+
   if (isLoading) {
     return (
       <Box>
@@ -206,139 +242,144 @@ function TaskList({
         </Box>
       ) : (
         <List sx={{ width: '100%' }}>
-          {tasks.map((task) => (
-            <React.Fragment key={task.id}>
-              <ListItem
-                alignItems="flex-start"
-                sx={{
-                  backgroundColor: task.completed ? 'rgba(0, 0, 0, 0.04)' : 
-                               task.escalated ? 'error.50' : 'transparent',
-                  borderRadius: 1,
-                  mb: 1,
-                  border: task.escalated ? '1px solid' : 'none',
-                  borderColor: 'error.light',
-                }}
-                secondaryAction={
-                  <Box>
-                    {task.escalated && (
-                      <Tooltip title="Task priority escalated">
-                        <IconButton size="small" color="error">
-                          <TrendingUpIcon />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    {new Date(task.dueDate) < new Date() && !task.completed && (
-                      <Tooltip title="Reschedule to next work day">
-                        <IconButton 
-                          size="small" 
-                          color="warning"
-                          onClick={() => handleReschedule(task.id)}
-                        >
-                          <ScheduleIcon />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    <Tooltip title="AI Analysis">
-                      <IconButton 
-                        edge="end" 
-                        aria-label="ai analysis"
-                        onClick={() => onAnalyzeTask(task)}
-                      >
-                        <SmartToyIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Edit">
-                      <IconButton 
-                        edge="end" 
-                        aria-label="edit"
-                        onClick={() => handleOpenEditDialog(task)}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton 
-                        edge="end" 
-                        aria-label="delete"
-                        onClick={() => onDeleteTask(task.id)}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                }
-              >
-                <ListItemIcon>
-                  <Checkbox
-                    edge="start"
-                    checked={task.completed}
-                    onChange={() => onToggleComplete(task.id)}
-                    sx={{
-                      '&.Mui-checked': {
-                        color: 'primary.main',
-                      },
-                    }}
-                  />
-                </ListItemIcon>
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography
-                        variant="subtitle1"
-                        sx={{
-                          textDecoration: task.completed ? 'line-through' : 'none',
-                          color: task.completed ? 'text.secondary' : 'text.primary',
-                        }}
-                      >
-                        {task.title}
-                      </Typography>
-                      <Chip
-                        label={task.priority}
-                        size="small"
-                        color={getPriorityColor(task.priority)}
-                        sx={{ textTransform: 'capitalize' }}
-                      />
+          {sortTasks(tasks).map((task) => {
+            const isOverdue = new Date(task.dueDate) < new Date() && !task.completed;
+            
+            return (
+              <React.Fragment key={task.id}>
+                <ListItem
+                  alignItems="flex-start"
+                  sx={{
+                    backgroundColor: task.completed ? 'rgba(0, 0, 0, 0.04)' : 
+                                 isOverdue ? 'error.100' :
+                                 task.escalated ? 'error.50' : 'transparent',
+                    borderRadius: 1,
+                    mb: 1,
+                    border: (isOverdue || task.escalated) ? '1px solid' : 'none',
+                    borderColor: 'error.light',
+                  }}
+                  secondaryAction={
+                    <Box>
                       {task.escalated && (
-                        <Chip
-                          label="Escalated"
-                          size="small"
-                          color="error"
-                          icon={<WarningIcon />}
-                          sx={{ textTransform: 'capitalize' }}
-                        />
+                        <Tooltip title="Task priority escalated">
+                          <IconButton size="small" color="error">
+                            <TrendingUpIcon />
+                          </IconButton>
+                        </Tooltip>
                       )}
+                      {new Date(task.dueDate) < new Date() && !task.completed && (
+                        <Tooltip title="Reschedule to next work day">
+                          <IconButton 
+                            size="small" 
+                            color="warning"
+                            onClick={() => handleReschedule(task.id)}
+                          >
+                            <ScheduleIcon />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      <Tooltip title="AI Analysis">
+                        <IconButton 
+                          edge="end" 
+                          aria-label="ai analysis"
+                          onClick={() => onAnalyzeTask(task)}
+                        >
+                          <SmartToyIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Edit">
+                        <IconButton 
+                          edge="end" 
+                          aria-label="edit"
+                          onClick={() => handleOpenEditDialog(task)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton 
+                          edge="end" 
+                          aria-label="delete"
+                          onClick={() => onDeleteTask(task.id)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
                     </Box>
                   }
-                  secondary={
-                    <React.Fragment>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{
-                          display: 'block',
-                          textDecoration: task.completed ? 'line-through' : 'none',
-                          mb: 0.5,
-                        }}
-                      >
-                        {task.description}
-                      </Typography>
-                      <Typography 
-                        variant="caption" 
-                        color={new Date(task.dueDate) < new Date() && !task.completed ? 'error.main' : 'text.secondary'}
-                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
-                      >
-                        Due: {new Date(task.dueDate).toLocaleDateString()}
-                        {new Date(task.dueDate) < new Date() && !task.completed && (
-                          <span>(Overdue)</span>
+                >
+                  <ListItemIcon>
+                    <Checkbox
+                      edge="start"
+                      checked={task.completed}
+                      onChange={() => onToggleComplete(task.id)}
+                      sx={{
+                        '&.Mui-checked': {
+                          color: 'primary.main',
+                        },
+                      }}
+                    />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{
+                            textDecoration: task.completed ? 'line-through' : 'none',
+                            color: task.completed ? 'text.secondary' : 'text.primary',
+                          }}
+                        >
+                          {task.title}
+                        </Typography>
+                        <Chip
+                          label={task.priority}
+                          size="small"
+                          color={getPriorityColor(task.priority)}
+                          sx={{ textTransform: 'capitalize' }}
+                        />
+                        {task.escalated && (
+                          <Chip
+                            label="Escalated"
+                            size="small"
+                            color="error"
+                            icon={<WarningIcon />}
+                            sx={{ textTransform: 'capitalize' }}
+                          />
                         )}
-                      </Typography>
-                    </React.Fragment>
-                  }
-                />
-              </ListItem>
-              <Divider component="li" />
-            </React.Fragment>
-          ))}
+                      </Box>
+                    }
+                    secondary={
+                      <React.Fragment>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            display: 'block',
+                            textDecoration: task.completed ? 'line-through' : 'none',
+                            mb: 0.5,
+                          }}
+                        >
+                          {task.description}
+                        </Typography>
+                        <Typography 
+                          variant="caption" 
+                          color={new Date(task.dueDate) < new Date() && !task.completed ? 'error.main' : 'text.secondary'}
+                          sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                        >
+                          Due: {new Date(task.dueDate).toLocaleDateString('da-DK')}
+                          {new Date(task.dueDate) < new Date() && !task.completed && (
+                            <span>(Overdue)</span>
+                          )}
+                        </Typography>
+                      </React.Fragment>
+                    }
+                  />
+                </ListItem>
+                <Divider component="li" />
+              </React.Fragment>
+            );
+          })}
         </List>
       )}
 

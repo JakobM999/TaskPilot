@@ -16,6 +16,7 @@ import {
   Paper,
 } from '@mui/material';
 import { format } from 'date-fns';
+import { da } from 'date-fns/locale';
 import EventIcon from '@mui/icons-material/Event';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -58,11 +59,23 @@ const mockEvents = [
 ];
 
 function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
-  // Group tasks by status
+  // Group tasks by status and only show today's and overdue tasks
   const groupedTasks = {
     completed: tasks.filter(t => t.completed),
-    overdue: tasks.filter(t => !t.completed && new Date(t.dueDate) < new Date()),
-    upcoming: tasks.filter(t => !t.completed && new Date(t.dueDate) >= new Date())
+    overdue: tasks.filter(t => {
+      const taskDate = new Date(t.dueDate);
+      taskDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return !t.completed && taskDate < today;
+    }),
+    today: tasks.filter(t => {
+      const taskDate = new Date(t.dueDate);
+      taskDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return taskDate.getTime() === today.getTime();
+    })
   };
 
   // Calculate statistics
@@ -70,7 +83,7 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
     total: tasks.length,
     completed: groupedTasks.completed.length,
     overdue: groupedTasks.overdue.length,
-    upcoming: groupedTasks.upcoming.length,
+    today: groupedTasks.today.length,
     completionRate: tasks.length ? 
       Math.round((groupedTasks.completed.length / tasks.length) * 100) : 0
   };
@@ -135,7 +148,7 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
                 }
                 secondary={
                   <Typography variant="caption" color="text.secondary">
-                    Due: {format(new Date(task.dueDate), 'MMM d, yyyy')}
+                    Due: {format(new Date(task.dueDate), 'dd/MM/yyyy', { locale: da })}
                   </Typography>
                 }
               />
@@ -293,10 +306,10 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
                 <Grid item xs={4}>
                   <Stack alignItems="center">
                     <Typography variant="h4" color="info.main">
-                      {stats.upcoming}
+                      {stats.today}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Upcoming
+                      Today
                     </Typography>
                   </Stack>
                 </Grid>
@@ -312,8 +325,8 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
               />
               
               <TaskGroup
-                title="Upcoming Tasks"
-                tasks={groupedTasks.upcoming}
+                title="Today's Tasks"
+                tasks={groupedTasks.today}
                 icon={<PendingIcon color="info" />}
                 color="info.main"
               />

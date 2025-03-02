@@ -17,6 +17,7 @@ import {
   Tooltip
 } from '@mui/material';
 import { format } from 'date-fns';
+import { da } from 'date-fns/locale';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
@@ -57,12 +58,12 @@ function Dashboard({ user, onLogout }) {
         if (taskError) {
           console.error('Error fetching tasks:', taskError);
         } else {
+          // Don't filter tasks here anymore, as it's handled in taskService
           setTasks(taskData || []);
           
           // Get initial AI advice
           const { data: aiData } = await getTaskManagementAdvice();
-          if (!mounted) return;
-          setAiSuggestion(aiData?.advice || "Let's help you stay focused and productive today.");
+          if (!mounted) setAiSuggestion(aiData?.advice || "Let's help you stay focused and productive today.");
         }
       } catch (err) {
         console.error('Error in dashboard:', err);
@@ -359,7 +360,7 @@ function Dashboard({ user, onLogout }) {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            {format(new Date(), 'EEEE, MMMM do, yyyy')}
+            {format(new Date(), 'EEEE, d. MMMM yyyy', { locale: da })}
           </Typography>
           <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
             <Button color="inherit" onClick={handleSignOut} startIcon={<LogoutIcon />}>
