@@ -2,7 +2,7 @@
 // This file allows easy switching between mock and Supabase implementations
 
 // Set this to true to use Supabase, false to use mock data
-const USE_SUPABASE = true;
+const USE_SUPABASE = true;  // Re-enabled Supabase integration
 
 // Auth services
 export const {

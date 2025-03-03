@@ -1,72 +1,128 @@
 -- TaskPilot Database Schema for Supabase
 -- This SQL script sets up the complete database schema including tables and security policies
 
--- TABLES
--- =======
+-- First, drop existing tables if they exist (BE CAREFUL - this will delete all data!)
+DROP TABLE IF EXISTS calendar_events CASCADE;
+DROP TABLE IF EXISTS user_settings CASCADE;
+DROP TABLE IF EXISTS tasks CASCADE;
 
--- Create a table for tasks
-CREATE TABLE tasks (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title TEXT NOT NULL,
-  description TEXT,
-  due_date DATE NOT NULL,
-  priority TEXT NOT NULL CHECK (priority IN ('low', 'medium', 'high')),
-  completed BOOLEAN NOT NULL DEFAULT FALSE,
-  escalated BOOLEAN NOT NULL DEFAULT FALSE,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- Drop all existing policies
+DO $$ 
+BEGIN
+    -- Drop all policies from tasks
+    DROP POLICY IF EXISTS tasks_select_policy ON tasks;
+    DROP POLICY IF EXISTS tasks_insert_policy ON tasks;
+    DROP POLICY IF EXISTS tasks_update_policy ON tasks;
+    DROP POLICY IF EXISTS tasks_delete_policy ON tasks;
+    DROP POLICY IF EXISTS tasks_bypass_policy ON tasks;
 
--- Create a table for user settings
-CREATE TABLE user_settings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
-  appearance JSONB NOT NULL DEFAULT '{"darkMode": false, "language": "en"}'::jsonb,
-  notifications JSONB NOT NULL DEFAULT '{"emailNotifications": true, "desktopNotifications": true, "reminderTime": 15}'::jsonb,
-  task_management JSONB NOT NULL DEFAULT '{"workingHoursStart": "09:00", "workingHoursEnd": "17:00", "defaultTaskDuration": 30, "autoEscalateOverdue": true}'::jsonb,
-  ai_assistant JSONB NOT NULL DEFAULT '{"aiEnabled": true, "aiSuggestionFrequency": "medium", "focusTimeLength": 25, "breakTimeLength": 5}'::jsonb,
-  calendar JSONB NOT NULL DEFAULT '{"calendarSync": true, "blockCalendarEvents": true}'::jsonb,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+    -- Drop all policies from user_settings
+    DROP POLICY IF EXISTS user_settings_select_policy ON user_settings;
+    DROP POLICY IF EXISTS user_settings_insert_policy ON user_settings;
+    DROP POLICY IF EXISTS user_settings_update_policy ON user_settings;
+    DROP POLICY IF EXISTS user_settings_delete_policy ON user_settings;
+    DROP POLICY IF EXISTS user_settings_bypass_policy ON user_settings;
 
--- Create a table for calendar events (optional for future implementation)
-CREATE TABLE calendar_events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title TEXT NOT NULL,
-  description TEXT,
-  type TEXT NOT NULL,
-  start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-  end_time TIMESTAMP WITH TIME ZONE NOT NULL,
-  location TEXT,
-  participants JSONB,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+    -- Drop all policies from calendar_events
+    DROP POLICY IF EXISTS calendar_events_select_policy ON calendar_events;
+    DROP POLICY IF EXISTS calendar_events_insert_policy ON calendar_events;
+    DROP POLICY IF EXISTS calendar_events_update_policy ON calendar_events;
+    DROP POLICY IF EXISTS calendar_events_delete_policy ON calendar_events;
+    DROP POLICY IF EXISTS calendar_events_bypass_policy ON calendar_events;
+END $$;
+
+-- Create tables if they don't exist
+DO $$ 
+BEGIN
+    -- Create tasks table if it doesn't exist
+    IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'tasks') THEN
+        CREATE TABLE tasks (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            title TEXT NOT NULL,
+            description TEXT,
+            due_date DATE NOT NULL,
+            priority TEXT NOT NULL CHECK (priority IN ('low', 'medium', 'high')),
+            completed BOOLEAN NOT NULL DEFAULT FALSE,
+            completed_at TIMESTAMP WITH TIME ZONE,
+            escalated BOOLEAN NOT NULL DEFAULT FALSE,
+            user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+    END IF;
+
+    -- Create user_settings table if it doesn't exist
+    IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_settings') THEN
+        CREATE TABLE user_settings (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+            appearance JSONB NOT NULL DEFAULT '{"darkMode": false, "language": "en"}'::jsonb,
+            notifications JSONB NOT NULL DEFAULT '{"emailNotifications": true, "desktopNotifications": true, "reminderTime": 15}'::jsonb,
+            task_management JSONB NOT NULL DEFAULT '{"workingHoursStart": "09:00", "workingHoursEnd": "17:00", "defaultTaskDuration": 30, "autoEscalateOverdue": true}'::jsonb,
+            ai_assistant JSONB NOT NULL DEFAULT '{"aiEnabled": true, "aiSuggestionFrequency": "medium", "focusTimeLength": 25, "breakTimeLength": 5}'::jsonb,
+            calendar JSONB NOT NULL DEFAULT '{"calendarSync": true, "blockCalendarEvents": true}'::jsonb,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+    END IF;
+
+    -- Create calendar_events table if it doesn't exist
+    IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'calendar_events') THEN
+        CREATE TABLE calendar_events (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            title TEXT NOT NULL,
+            description TEXT,
+            type TEXT NOT NULL,
+            start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+            end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+            location TEXT,
+            participants JSONB,
+            user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+    END IF;
+END $$;
 
 -- INDEXES
 -- =======
--- Create indexes for improved performance on common queries
+-- Create indexes if they don't exist
+DO $$
+BEGIN
+    -- Tasks indexes
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_tasks_user_id') THEN
+        CREATE INDEX idx_tasks_user_id ON tasks(user_id);
+    END IF;
 
--- Index on tasks by user_id for faster retrieval of a user's tasks
-CREATE INDEX idx_tasks_user_id ON tasks(user_id);
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_tasks_due_date') THEN
+        CREATE INDEX idx_tasks_due_date ON tasks(due_date);
+    END IF;
 
--- Index on tasks by due_date for faster date-based queries
-CREATE INDEX idx_tasks_due_date ON tasks(due_date);
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_tasks_completed') THEN
+        CREATE INDEX idx_tasks_completed ON tasks(completed);
+    END IF;
 
--- Index on tasks by completed status
-CREATE INDEX idx_tasks_completed ON tasks(completed);
+    -- User settings index
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_user_settings_user_id') THEN
+        CREATE INDEX idx_user_settings_user_id ON user_settings(user_id);
+    END IF;
 
--- Index on user_settings by user_id
-CREATE INDEX idx_user_settings_user_id ON user_settings(user_id);
-
--- Index on calendar_events by user_id and start_time
-CREATE INDEX idx_calendar_events_user_id_start_time ON calendar_events(user_id, start_time);
+    -- Calendar events index
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_calendar_events_user_id_start_time') THEN
+        CREATE INDEX idx_calendar_events_user_id_start_time ON calendar_events(user_id, start_time);
+    END IF;
+END $$;
 
 -- FUNCTIONS
 -- =========
+
+-- Simple ping function used for connectivity testing
+CREATE OR REPLACE FUNCTION ping()
+RETURNS TEXT AS $$
+BEGIN
+  RETURN 'pong';
+END;
+$$ LANGUAGE plpgsql;
 
 -- Function to update the updated_at timestamp
 CREATE OR REPLACE FUNCTION update_timestamp()
@@ -79,6 +135,11 @@ $$ LANGUAGE plpgsql;
 
 -- TRIGGERS
 -- ========
+
+-- Drop existing triggers first
+DROP TRIGGER IF EXISTS update_tasks_timestamp ON tasks;
+DROP TRIGGER IF EXISTS update_user_settings_timestamp ON user_settings;
+DROP TRIGGER IF EXISTS update_calendar_events_timestamp ON calendar_events;
 
 -- Create triggers to automatically update the updated_at timestamp
 CREATE TRIGGER update_tasks_timestamp

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -26,39 +26,27 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingIcon from '@mui/icons-material/Pending';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import GroupsIcon from '@mui/icons-material/Groups';
-
-// Mock events data
-const mockEvents = [
-  {
-    id: 1,
-    title: 'Team Standup',
-    type: 'meeting',
-    startTime: '09:00',
-    endTime: '09:30',
-    location: 'Teams Meeting',
-    participants: ['John', 'Sarah', 'Mike']
-  },
-  {
-    id: 2,
-    title: 'Client Project Review',
-    type: 'meeting',
-    startTime: '11:00',
-    endTime: '12:00',
-    location: 'Conference Room A',
-    participants: ['Client', 'PM', 'Tech Lead']
-  },
-  {
-    id: 3,
-    title: 'Development Focus Time',
-    type: 'focus',
-    startTime: '14:00',
-    endTime: '16:00',
-    location: '',
-    participants: []
-  }
-];
+import { getTodayEvents } from '../services/calendarService.supabase';
 
 function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
+  const [events, setEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+
+  // Fetch calendar events when component mounts
+  useEffect(() => {
+    const fetchEvents = async () => {
+      const { data, error } = await getTodayEvents();
+      if (error) {
+        console.error('Error loading calendar events:', error);
+      } else {
+        setEvents(data || []);
+      }
+      setEventsLoading(false);
+    };
+
+    fetchEvents();
+  }, []);
+
   // Group tasks by status and only show today's and overdue tasks
   const groupedTasks = {
     completed: tasks.filter(t => t.completed),
@@ -74,8 +62,11 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
       taskDate.setHours(0, 0, 0, 0);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      return taskDate.getTime() === today.getTime();
-    })
+      // Only show uncompleted tasks for today
+      return !t.completed && taskDate.getTime() === today.getTime();
+    }),
+    // Add awaiting tasks (all uncompleted tasks)
+    awaiting: tasks.filter(t => !t.completed)
   };
 
   // Calculate statistics
@@ -84,11 +75,12 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
     completed: groupedTasks.completed.length,
     overdue: groupedTasks.overdue.length,
     today: groupedTasks.today.length,
+    awaiting: groupedTasks.awaiting.length,
     completionRate: tasks.length ? 
       Math.round((groupedTasks.completed.length / tasks.length) * 100) : 0
   };
 
-  // Render loading skeleton
+  // Render loading skeleton for tasks section
   if (isLoading) {
     return (
       <Box>
@@ -179,75 +171,90 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
       <Typography variant="h6" component="h2" gutterBottom>
         Today's Schedule
       </Typography>
-      <List sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
-        {mockEvents.map((event) => (
-          <React.Fragment key={event.id}>
-            <ListItem
-              sx={{
-                borderLeft: 2,
-                borderColor: event.type === 'meeting' ? 'primary.main' : 'secondary.main',
-                mb: 1,
-                bgcolor: 'background.paper',
-                borderRadius: 1,
-                boxShadow: 1,
-              }}
-            >
-              <ListItemText
-                primary={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="subtitle2">
-                      {event.title}
-                    </Typography>
-                    <Chip
-                      size="small"
-                      label={event.type}
-                      color={event.type === 'meeting' ? 'primary' : 'secondary'}
-                      sx={{ height: 20 }}
-                    />
-                  </Box>
-                }
-                secondary={
-                  <Box sx={{ mt: 0.5 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <AccessTimeIcon fontSize="small" color="action" />
-                      <Typography variant="caption">
-                        {event.startTime} - {event.endTime}
+      {eventsLoading ? (
+        // Show loading skeleton for events
+        [1, 2, 3].map((item) => (
+          <Box key={item} sx={{ mb: 2 }}>
+            <Skeleton variant="text" width="60%" height={24} />
+            <Skeleton variant="text" width="40%" height={20} />
+          </Box>
+        ))
+      ) : events.length > 0 ? (
+        <List sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
+          {events.map((event) => (
+            <React.Fragment key={event.id}>
+              <ListItem
+                sx={{
+                  borderLeft: 2,
+                  borderColor: event.type === 'meeting' ? 'primary.main' : 'secondary.main',
+                  mb: 1,
+                  bgcolor: 'background.paper',
+                  borderRadius: 1,
+                  boxShadow: 1,
+                }}
+              >
+                <ListItemText
+                  primary={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="subtitle2">
+                        {event.title}
                       </Typography>
+                      <Chip
+                        size="small"
+                        label={event.type}
+                        color={event.type === 'meeting' ? 'primary' : 'secondary'}
+                        sx={{ height: 20 }}
+                      />
                     </Box>
-                    {event.location && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {event.location.includes('Teams') ? (
-                          <VideocamIcon fontSize="small" color="action" />
-                        ) : (
-                          <LocationOnIcon fontSize="small" color="action" />
-                        )}
+                  }
+                  secondary={
+                    <Box sx={{ mt: 0.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <AccessTimeIcon fontSize="small" color="action" />
                         <Typography variant="caption">
-                          {event.location}
+                          {event.startTime} - {event.endTime}
                         </Typography>
                       </Box>
-                    )}
-                    {event.participants.length > 0 && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                        <GroupsIcon fontSize="small" color="action" />
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          {event.participants.map((participant, index) => (
-                            <Chip
-                              key={index}
-                              label={participant}
-                              size="small"
-                              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                            />
-                          ))}
+                      {event.location && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {event.location.includes('Teams') ? (
+                            <VideocamIcon fontSize="small" color="action" />
+                          ) : (
+                            <LocationOnIcon fontSize="small" color="action" />
+                          )}
+                          <Typography variant="caption">
+                            {event.location}
+                          </Typography>
                         </Box>
-                      </Box>
-                    )}
-                  </Box>
-                }
-              />
-            </ListItem>
-          </React.Fragment>
-        ))}
-      </List>
+                      )}
+                      {event.participants?.length > 0 && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                          <GroupsIcon fontSize="small" color="action" />
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            {event.participants.map((participant, index) => (
+                              <Chip
+                                key={index}
+                                label={participant}
+                                size="small"
+                                sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                              />
+                            ))}
+                          </Box>
+                        </Box>
+                      )}
+                    </Box>
+                  }
+                />
+              </ListItem>
+              <Divider component="li" />
+            </React.Fragment>
+          ))}
+        </List>
+      ) : (
+        <Typography variant="body2" color="text.secondary">
+          No events scheduled for today
+        </Typography>
+      )}
     </Box>
   );
 
@@ -283,7 +290,7 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
                     {stats.completionRate}% completed
                   </Typography>
                 </Grid>
-                <Grid item xs={4}>
+                <Grid item xs={3}>
                   <Stack alignItems="center">
                     <Typography variant="h4" color="success.main">
                       {stats.completed}
@@ -293,7 +300,7 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
                     </Typography>
                   </Stack>
                 </Grid>
-                <Grid item xs={4}>
+                <Grid item xs={3}>
                   <Stack alignItems="center">
                     <Typography variant="h4" color="error.main">
                       {stats.overdue}
@@ -303,13 +310,23 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
                     </Typography>
                   </Stack>
                 </Grid>
-                <Grid item xs={4}>
+                <Grid item xs={3}>
                   <Stack alignItems="center">
                     <Typography variant="h4" color="info.main">
                       {stats.today}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Today
+                    </Typography>
+                  </Stack>
+                </Grid>
+                <Grid item xs={3}>
+                  <Stack alignItems="center">
+                    <Typography variant="h4" color="warning.main">
+                      {stats.awaiting}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" align="center">
+                      Total Awaiting
                     </Typography>
                   </Stack>
                 </Grid>

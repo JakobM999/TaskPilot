@@ -17,6 +17,8 @@ import {
   ListItemIcon,
   ListItemText,
   ListSubheader,
+  Stack,
+  Collapse,
 } from '@mui/material';
 import {
   Brightness4 as DarkModeIcon,
@@ -28,7 +30,13 @@ import {
   RestartAlt as RestartAltIcon,
   AccessTime as AccessTimeIcon,
   Save as SaveIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  Storage as StorageIcon,
+  Help as HelpIcon,
 } from '@mui/icons-material';
+import { testSupabaseConnection } from '../services/testSupabase';
+import { verifySupabaseSchema } from '../services/verifySchema';
 
 function Settings() {
   // Theme settings
@@ -57,6 +65,12 @@ function Settings() {
   const [blockCalendarEvents, setBlockCalendarEvents] = useState(true);
 
   const [saveStatus, setSaveStatus] = useState(null);
+
+  const [testResult, setTestResult] = useState(null);
+  const [testError, setTestError] = useState(null);
+  const [schemaResult, setSchemaResult] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showDatabaseDetails, setShowDatabaseDetails] = useState(false);
 
   const handleSave = () => {
     // Here we'll save to local storage for now
@@ -101,6 +115,42 @@ function Settings() {
     setBreakTimeLength(5);
     setCalendarSync(true);
     setBlockCalendarEvents(true);
+  };
+
+  const handleTestConnection = async () => {
+    setIsLoading(true);
+    setTestResult(null);
+    setTestError(null);
+    
+    try {
+      const testResult = await testSupabaseConnection();
+      setTestResult(testResult);
+      
+      if (!testResult.success) {
+        setTestError(testResult.message || "Unknown error occurred");
+      }
+    } catch (err) {
+      setTestError(err.message || 'An error occurred during testing');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifySchema = async () => {
+    setIsLoading(true);
+    setSchemaResult(null);
+    
+    try {
+      const result = await verifySupabaseSchema();
+      setSchemaResult(result);
+    } catch (err) {
+      setSchemaResult({
+        success: false,
+        message: err.message || 'Error verifying schema'
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -421,6 +471,99 @@ function Settings() {
                 label="Block calendar during focus time"
               />
             </Box>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <StorageIcon />
+              Database Connection
+            </Typography>
+
+            <Stack spacing={2}>
+              <Button
+                variant="outlined"
+                onClick={handleTestConnection}
+                disabled={isLoading}
+                startIcon={<StorageIcon />}
+              >
+                Test Database Connection
+              </Button>
+
+              <Button
+                variant="outlined"
+                onClick={handleVerifySchema}
+                disabled={isLoading}
+                startIcon={<StorageIcon />}
+              >
+                Verify Database Schema
+              </Button>
+
+              {testResult && (
+                <Alert severity={testResult.success ? "success" : "error"}>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    {testResult.success ? "Connection Successful" : "Connection Failed"}
+                  </Typography>
+                  <Typography variant="body2">
+                    {testResult.message || (testResult.success ? "Successfully connected to database!" : "Failed to connect to database.")}
+                  </Typography>
+                </Alert>
+              )}
+
+              {schemaResult && (
+                <Alert severity={schemaResult.success ? "success" : "error"}>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    {schemaResult.success ? "Schema Verification Successful" : "Schema Verification Failed"}
+                  </Typography>
+                  <Typography variant="body2">
+                    {schemaResult.message}
+                  </Typography>
+                </Alert>
+              )}
+
+              {(testError || (!testResult?.success && !schemaResult?.success)) && (
+                <>
+                  <Button
+                    fullWidth
+                    sx={{ mt: 2 }}
+                    endIcon={showDatabaseDetails ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    onClick={() => setShowDatabaseDetails(!showDatabaseDetails)}
+                  >
+                    {showDatabaseDetails ? 'Hide Troubleshooting' : 'Show Troubleshooting'}
+                  </Button>
+
+                  <Collapse in={showDatabaseDetails}>
+                    <Paper sx={{ p: 3 }} variant="outlined">
+                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <HelpIcon color="info" />
+                        Troubleshooting Steps
+                      </Typography>
+                      <List>
+                        <ListItem>
+                          <ListItemText 
+                            primary="Check if Database is Running" 
+                            secondary="Make sure your database server is running at the URL you specified." 
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemText 
+                            primary="Verify API Key" 
+                            secondary="Double-check that you've copied the correct API key from your dashboard." 
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemText 
+                            primary="Run Database Schema" 
+                            secondary="Make sure to run the schema.sql script to create all necessary tables." 
+                          />
+                        </ListItem>
+                      </List>
+                    </Paper>
+                  </Collapse>
+                </>
+              )}
+            </Stack>
           </Paper>
         </Grid>
       </Grid>

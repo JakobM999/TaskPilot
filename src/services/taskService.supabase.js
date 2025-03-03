@@ -1,130 +1,66 @@
 // Supabase Task Service
 import supabase from './supabaseClient';
 import { addDays, startOfToday, endOfToday, startOfTomorrow, endOfTomorrow, 
-         addWeeks, startOfMonth, endOfMonth } from 'date-fns';
+         addWeeks, startOfMonth, endOfMonth, format } from 'date-fns';
 
 // Get tasks based on timeframe
 export const getTasks = async (timeframe = 'today') => {
   try {
-    const today = startOfToday();
-    let query = supabase
-      .from('tasks')
-      .select('*');
+    // Get the current user's ID and log auth state
+    const { data: { user } } = await supabase.auth.getUser();
+    console.log('Current auth state:', { user });
+    
+    if (!user) {
+      console.error('No authenticated user found');
+      throw new Error('User must be authenticated to fetch tasks');
+    }
 
-    // Get overdue tasks (past tasks that are not completed)
-    let overdueTasks = [];
-    const { data: overdueData, error: overdueError } = await supabase
+    console.log('Fetching tasks for user:', user.id);
+
+    // Get user settings to check if auto-escalation is enabled
+    const { data: settings } = await supabase
+      .from('user_settings')
+      .select('task_management')
+      .eq('user_id', user.id)
+      .single();
+
+    const autoEscalateEnabled = settings?.task_management?.autoEscalateOverdue ?? true;
+
+    // Simply get all tasks for the current user
+    const { data: taskData, error: taskError } = await supabase
       .from('tasks')
       .select('*')
-      .lt('due_date', today.toISOString())
-      .eq('completed', false)
+      .eq('user_id', user.id)  // Explicitly filter by user_id
       .order('due_date', { ascending: true });
 
-    if (overdueError) throw overdueError;
-    overdueTasks = overdueData || [];
-
-    // Filter based on timeframe
-    let timeframeTasks = [];
-    if (timeframe === 'today') {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .gte('due_date', startOfToday().toISOString())
-        .lte('due_date', endOfToday().toISOString());
-
-      if (error) throw error;
-      timeframeTasks = data || [];
-    } 
-    else if (timeframe === 'tomorrow') {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .gte('due_date', startOfTomorrow().toISOString())
-        .lte('due_date', endOfTomorrow().toISOString());
-
-      if (error) throw error;
-      timeframeTasks = data || [];
-    } 
-    else if (timeframe === 'week') {
-      const nextWeek = addWeeks(today, 1);
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .gte('due_date', today.toISOString())
-        .lte('due_date', nextWeek.toISOString());
-
-      if (error) throw error;
-      timeframeTasks = data || [];
-    } 
-    else if (timeframe === 'month') {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .gte('due_date', startOfMonth(today).toISOString())
-        .lte('due_date', endOfMonth(today).toISOString());
-
-      if (error) throw error;
-      timeframeTasks = data || [];
-    } 
-    else if (timeframe === 'upcoming') {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .gt('due_date', today.toISOString());
-
-      if (error) throw error;
-      timeframeTasks = data || [];
-    } 
-    else if (timeframe === 'overdue') {
-      timeframeTasks = overdueTasks;
-    } 
-    else {
-      // Get all tasks
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*');
-
-      if (error) throw error;
-      timeframeTasks = data || [];
+    if (taskError) {
+      console.error('Error fetching tasks:', taskError);
+      throw taskError;
     }
 
-    // For any timeframe other than 'overdue', combine overdue tasks with timeframe tasks
-    if (timeframe !== 'overdue') {
-      // Combine tasks and remove duplicates
-      const taskMap = new Map();
-      
-      // Add overdue tasks to map first
-      overdueTasks.forEach(task => {
-        taskMap.set(task.id, {
-          id: task.id,
-          title: task.title,
-          description: task.description,
-          dueDate: task.due_date,
-          priority: task.priority,
-          completed: task.completed,
-          escalated: task.escalated
-        });
-      });
-      
-      // Add timeframe tasks, overwriting any duplicate IDs
-      timeframeTasks.forEach(task => {
-        taskMap.set(task.id, {
-          id: task.id,
-          title: task.title,
-          description: task.description,
-          dueDate: task.due_date,
-          priority: task.priority,
-          completed: task.completed,
-          escalated: task.escalated
-        });
-      });
-      
-      const combinedTasks = Array.from(taskMap.values());
-      return { data: combinedTasks, error: null };
+    console.log('Tasks fetched:', taskData);
+    const allTasks = taskData || [];
+
+    // Check for overdue tasks and auto-escalate if enabled
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (autoEscalateEnabled) {
+      for (const task of allTasks) {
+        const taskDate = new Date(task.due_date);
+        if (!task.completed && taskDate < today && !task.escalated) {
+          // Auto-escalate the overdue task
+          await supabase
+            .from('tasks')
+            .update({ escalated: true })
+            .eq('id', task.id);
+          task.escalated = true;
+        }
+      }
     }
 
-    // Convert Supabase tasks to the format expected by the frontend
-    const formattedTasks = timeframeTasks.map(task => ({
+    // Format tasks for frontend
+    const formattedTasks = allTasks.map(task => ({
       id: task.id,
       title: task.title,
       description: task.description,
@@ -134,24 +70,52 @@ export const getTasks = async (timeframe = 'today') => {
       escalated: task.escalated
     }));
 
+    console.log('Formatted tasks:', formattedTasks);
     return { data: formattedTasks, error: null };
   } catch (error) {
-    console.error('Error fetching tasks:', error);
+    console.error('Error in getTasks:', error);
     return { data: null, error };
   }
+};
+
+// Helper function to check if a task was completed today
+const isCompletedToday = (completedAt) => {
+  if (!completedAt) return false;
+  const completedDate = new Date(completedAt);
+  const today = new Date();
+  return (
+    completedDate.getDate() === today.getDate() &&
+    completedDate.getMonth() === today.getMonth() &&
+    completedDate.getFullYear() === today.getFullYear()
+  );
 };
 
 // Create a new task
 export const createTask = async (task) => {
   try {
+    // Get the current user's ID
+    const { data: { user } } = await supabase.auth.getUser();
+    console.log('Creating task - auth state:', { user });
+    
+    if (!user) {
+      console.error('No authenticated user found when creating task');
+      throw new Error('User must be authenticated to create tasks');
+    }
+
+    // Format the date properly for PostgreSQL (YYYY-MM-DD)
+    const formattedDate = format(new Date(task.dueDate), 'yyyy-MM-dd');
+
     const newTask = {
       title: task.title,
       description: task.description,
-      due_date: task.dueDate,
+      due_date: formattedDate,
       priority: task.priority,
       completed: false,
-      escalated: false
+      escalated: false,
+      user_id: user.id  // Make sure user_id is set
     };
+
+    console.log('Attempting to create task:', newTask);
 
     const { data, error } = await supabase
       .from('tasks')
@@ -159,7 +123,12 @@ export const createTask = async (task) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error in createTask:', error);
+      throw error;
+    }
+
+    console.log('Task created successfully:', data);
 
     // Format task for frontend
     const formattedTask = {
@@ -184,10 +153,13 @@ export const updateTask = async (task) => {
   try {
     const { id, title, description, dueDate, priority, completed, escalated } = task;
 
+    // Format the date properly for PostgreSQL (YYYY-MM-DD)
+    const formattedDate = format(new Date(dueDate), 'yyyy-MM-dd');
+
     const updatedTask = {
       title,
       description,
-      due_date: dueDate,
+      due_date: formattedDate,
       priority,
       completed: completed || false,
       escalated: escalated || false
@@ -249,10 +221,13 @@ export const toggleTaskCompletion = async (taskId) => {
 
     if (fetchError) throw fetchError;
 
-    // Toggle the completion status
+    // Toggle the completion status and update completed_at
     const { data, error: updateError } = await supabase
       .from('tasks')
-      .update({ completed: !task.completed })
+      .update({ 
+        completed: !task.completed,
+        completed_at: !task.completed ? new Date().toISOString() : null 
+      })
       .eq('id', taskId)
       .select()
       .single();
