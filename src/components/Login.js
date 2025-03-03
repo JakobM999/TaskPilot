@@ -10,7 +10,7 @@ import {
   Divider,
   CircularProgress
 } from '@mui/material';
-import { signIn, signUp, signInWithMicrosoft } from '../services/authService';
+import { signIn, signUp, signInWithMicrosoft } from '../services/index';
 
 function Login({ onLogin }) {
   const [isSignUp, setIsSignUp] = useState(false);

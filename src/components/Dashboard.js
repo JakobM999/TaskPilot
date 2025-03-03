@@ -23,14 +23,16 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
+import StorageIcon from '@mui/icons-material/Storage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TaskList from './TaskList';
 import Calendar from './Calendar';
 import AIAssistant from './AIAssistant';
 import Settings from './Settings';
-import { signOut } from '../services/authService';
-import { getTasks, createTask, updateTask, deleteTask, toggleTaskCompletion, rescheduleTask } from '../services/taskService';
+import SupabaseTest from './SupabaseTest';
+import { signOut } from '../services/index';
+import { getTasks, createTask, updateTask, deleteTask, toggleTaskCompletion, rescheduleTask } from '../services/index';
 import { analyzeTask, prioritizeTasks, getTaskManagementAdvice } from '../services/aiService';
 
 const drawerWidth = 240;
@@ -233,6 +235,18 @@ function Dashboard({ user, onLogout }) {
         </ListItem>
         <ListItem 
           button 
+          onClick={() => setActiveTab('database')}
+          selected={activeTab === 'database'}
+        >
+          <ListItemIcon>
+            <Tooltip title="Database" placement="right">
+              <StorageIcon />
+            </Tooltip>
+          </ListItemIcon>
+          {!sidebarCollapsed && <ListItemText primary="Database" />}
+        </ListItem>
+        <ListItem 
+          button 
           onClick={() => setActiveTab('settings')}
           selected={activeTab === 'settings'}
         >
@@ -290,7 +304,23 @@ function Dashboard({ user, onLogout }) {
           </Box>
         );
       case 'settings':
-        return <Settings />;
+        // Explicitly render the Settings component with full-width paper wrapper
+        return (
+          <Box sx={{ p: 3 }}>
+            <Paper sx={{ p: 3, borderRadius: 2 }}>
+              <Settings />
+            </Paper>
+          </Box>
+        );
+      case 'database':
+        // New case for database/Supabase test
+        return (
+          <Box sx={{ p: 3 }}>
+            <Paper sx={{ p: 3, borderRadius: 2 }}>
+              <SupabaseTest />
+            </Paper>
+          </Box>
+        );
       default:
         return (
           <Box sx={{ p: 3 }}>
