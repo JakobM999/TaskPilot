@@ -75,21 +75,38 @@ export const getTasks = async (timeframe = 'today') => {
 
     console.log('Formatted tasks:', formattedTasks);
 
-    // Filter tasks based on timeframe
+    // Helper function to sort tasks by priority and due date
+    const sortByPriorityAndDueDate = (tasks) => {
+      const priorityOrder = { high: 1, medium: 2, low: 3 };
+      
+      return tasks.sort((a, b) => {
+        // First sort by overdue status
+        const aDate = new Date(a.dueDate);
+        const bDate = new Date(b.dueDate);
+        const aOverdue = aDate < today;
+        const bOverdue = bDate < today;
+        
+        if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+        
+        // Then sort by priority
+        if (a.priority !== b.priority) {
+          return priorityOrder[a.priority] - priorityOrder[b.priority];
+        }
+        
+        // Finally sort by due date
+        return aDate - bDate;
+      });
+    };
+
+    // Filter and sort tasks based on timeframe
     if (timeframe === 'today') {
-      // For 'today' timeframe, only return today's tasks and overdue tasks
-      return {
-        data: formattedTasks.filter(task => {
-          if (task.completed) return false;
-          
-          const taskDate = new Date(task.dueDate);
-          taskDate.setHours(0, 0, 0, 0);
-          
-          // Show task if it's due today or overdue
-          return taskDate.getTime() <= today.getTime();
-        }),
-        error: null
-      };
+      const filteredTasks = formattedTasks.filter(task => {
+        if (task.completed) return false;
+        const taskDate = new Date(task.dueDate);
+        taskDate.setHours(0, 0, 0, 0);
+        return taskDate.getTime() <= today.getTime();
+      });
+      return { data: sortByPriorityAndDueDate(filteredTasks), error: null };
     } else if (timeframe === 'tomorrow') {
       // For 'tomorrow' timeframe, return tomorrow's tasks
       const tomorrow = new Date(today);
@@ -153,8 +170,8 @@ export const getTasks = async (timeframe = 'today') => {
       };
     }
 
-    // Return all tasks for any other timeframe
-    return { data: formattedTasks, error: null };
+    // Return all tasks sorted by priority and due date
+    return { data: sortByPriorityAndDueDate(formattedTasks), error: null };
   } catch (error) {
     console.error('Error in getTasks:', error);
     return { data: null, error };

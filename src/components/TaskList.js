@@ -145,9 +145,11 @@ function TaskList({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Split tasks into three categories: overdue, timeframe tasks, and completed
+    // Split tasks into categories
     const overdueTasks = [];
-    const timeframeTasks = [];
+    const highPriorityTasks = [];
+    const mediumPriorityTasks = [];
+    const lowPriorityTasks = [];
     const completedTasks = [];
 
     tasks.forEach(task => {
@@ -162,19 +164,39 @@ function TaskList({
       if (taskDate < today) {
         overdueTasks.push(task);
       } else {
-        timeframeTasks.push(task);
+        switch (task.priority) {
+          case 'high':
+            highPriorityTasks.push(task);
+            break;
+          case 'medium':
+            mediumPriorityTasks.push(task);
+            break;
+          case 'low':
+            lowPriorityTasks.push(task);
+            break;
+          default:
+            mediumPriorityTasks.push(task); // Default to medium if priority not set
+        }
       }
     });
 
-    // Sort overdue tasks by due date (oldest first)
-    overdueTasks.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-    // Sort timeframe tasks by due date
-    timeframeTasks.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-    // Sort completed tasks by due date (most recent first)
-    completedTasks.sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate));
+    // Sort each category by due date
+    const sortByDueDate = (a, b) => new Date(a.dueDate) - new Date(b.dueDate);
+    
+    overdueTasks.sort(sortByDueDate);
+    highPriorityTasks.sort(sortByDueDate);
+    mediumPriorityTasks.sort(sortByDueDate);
+    lowPriorityTasks.sort(sortByDueDate);
+    completedTasks.sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate)); // Most recent first
 
-    // Combine all tasks with overdue tasks first
-    return [...overdueTasks, ...timeframeTasks, ...completedTasks];
+    // Combine all tasks in the desired order
+    return [
+      ...overdueTasks,
+      ...highPriorityTasks,
+      ...mediumPriorityTasks,
+      ...lowPriorityTasks,
+      ...completedTasks
+    ];
   };
 
   if (isLoading) {
