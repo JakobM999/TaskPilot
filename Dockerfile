@@ -1,31 +1,38 @@
 # Build stage
 FROM node:18-alpine as build
 
+# Declare build arguments
+ARG REACT_APP_SUPABASE_URL
+ARG REACT_APP_SUPABASE_ANON_KEY
+
+# Set environment variables for build time
+ENV REACT_APP_SUPABASE_URL=$REACT_APP_SUPABASE_URL
+ENV REACT_APP_SUPABASE_ANON_KEY=$REACT_APP_SUPABASE_ANON_KEY
+
 WORKDIR /app
 
-# Copy package.json and package-lock.json
+# Copy package files and install dependencies
 COPY package*.json ./
-
-# Install dependencies
 RUN npm ci
 
-# Copy the rest of the code
+# Copy the rest of the code and build
 COPY . .
-
-# Build the application
 RUN npm run build
 
 # Production stage
 FROM nginx:alpine
 
-# Copy the build output to replace the default nginx contents
+# Copy the build output
 COPY --from=build /app/build /usr/share/nginx/html
 
-# Copy custom nginx config if needed
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Add nginx config for React router
+RUN echo $'server {\n\
+    listen 80;\n\
+    location / {\n\
+        root /usr/share/nginx/html;\n\
+        try_files $uri $uri/ /index.html;\n\
+    }\n\
+}' > /etc/nginx/conf.d/default.conf
 
-# Expose port 80
 EXPOSE 80
-
-# Start nginx
 CMD ["nginx", "-g", "daemon off;"]
