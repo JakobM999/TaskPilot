@@ -6,29 +6,12 @@ services:
     build: .
     container_name: taskpilot-app
     ports:
-      - "3030:80"  # Changed from 80:80 to 3030:80
+      - "3030:80"
     restart: always
     environment:
       - NODE_ENV=production
-      - REACT_APP_SUPABASE_URL=${SUPABASE_URL}
-      - REACT_APP_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-    depends_on:
-      - supabase-db
-      
-  # Supabase database service
-  supabase-db:
-    image: supabase/postgres:15.1.0.37
-    container_name: taskpilot-supabase
-    restart: always
-    volumes:
-      - supabase-data:/var/lib/postgresql/data
-      - ./supabase/schema.sql:/docker-entrypoint-initdb.d/schema.sql
-    environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-taskpilot}
-    ports:
-      - "5435:5432"  # Changed from 5432:5432 to 5435:5432
+      - REACT_APP_SUPABASE_URL=http://192.168.0.195:8000
+      - REACT_APP_SUPABASE_ANON_KEY=${REACT_APP_SUPABASE_ANON_KEY}
 
 volumes:
   supabase-data:

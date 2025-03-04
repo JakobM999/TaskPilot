@@ -8,6 +8,7 @@ This guide walks you through deploying the TaskPilot application on your local D
 - Git installed on your server
 - Access to the server via SSH or direct terminal
 - GitHub account with access to the TaskPilot repository
+- Access to existing Supabase instance at 192.168.0.195:8000
 
 ## Step 1: Clone the Repository
 
@@ -28,19 +29,11 @@ cd TaskPilot
 cp .env.docker .env
 ```
 
-2. Edit the `.env` file with your preferred database credentials:
-
-```bash
-nano .env
-```
-
-Make sure to update:
-- `DB_PASSWORD`: Use a secure password
-- `SUPABASE_ANON_KEY`: If you have your own Supabase project key
+The environment file is pre-configured to use the existing Supabase instance at 192.168.0.195:8000.
 
 ## Step 3: Build and Start the Application
 
-1. Build and start the Docker containers:
+1. Build and start the Docker container:
 
 ```bash
 docker-compose up -d
@@ -48,28 +41,17 @@ docker-compose up -d
 
 This command:
 - Builds the TaskPilot React application
-- Creates a Supabase PostgreSQL database
-- Starts both services in detached mode
+- Starts the service in detached mode
 
-2. Verify the containers are running:
+2. Verify the container is running:
 
 ```bash
 docker-compose ps
 ```
 
-You should see both `taskpilot-app` and `taskpilot-supabase` containers running.
+You should see the `taskpilot-app` container running.
 
-## Step 4: Initialize the Database
-
-The database schema should be automatically loaded from the `supabase/schema.sql` file. To verify the database is properly set up:
-
-```bash
-docker-compose exec supabase-db psql -U postgres -d taskpilot -c "\dt"
-```
-
-This should display the tables in your TaskPilot database.
-
-## Step 5: Access the Application
+## Step 4: Access the Application
 
 Once everything is running, you can access TaskPilot at:
 
@@ -77,11 +59,9 @@ Once everything is running, you can access TaskPilot at:
 http://your-server-ip:3030
 ```
 
-Replace `your-server-ip` with your server's IP address or domain name. Note that TaskPilot runs on port 3030 to avoid conflicts with other services.
+Replace `your-server-ip` with your server's IP address or domain name.
 
-The Supabase database is accessible on port 5435 (not directly accessible from outside unless specifically needed).
-
-## Step 6: Update the Application (Manual Process)
+## Step 5: Update the Application (Manual Process)
 
 To update the application when there are changes in the GitHub repository:
 
@@ -97,7 +77,7 @@ cd /path/to/TaskPilot
 git pull origin master
 ```
 
-3. Rebuild and restart the containers:
+3. Rebuild and restart the container:
 
 ```bash
 docker-compose down
@@ -110,60 +90,30 @@ This will rebuild the TaskPilot application with the latest changes.
 
 ### Port Conflicts
 
-If you see errors about ports being in use:
+If you see errors about port 3030 being in use:
 
-1. Check if other services are using ports 3030 or 5435:
+1. Check if other services are using port 3030:
 ```bash
 sudo lsof -i :3030
-sudo lsof -i :5435
 ```
 
-2. If needed, you can modify the ports in docker-compose.yml to use different ones.
+2. If needed, you can modify the port in docker-compose.yml to use a different one.
 
-### Database Connection Issues
+### Connection Issues
 
-If the application can't connect to the database:
+If the application can't connect to Supabase:
 
-1. Check if the database container is running:
-
-```bash
-docker-compose ps supabase-db
-```
-
-2. Check the database logs:
-
-```bash
-docker-compose logs supabase-db
-```
-
-### Application Startup Issues
-
-If the application doesn't start properly:
-
-1. Check the application logs:
+1. Verify that the Supabase instance is running at 192.168.0.195:8000
+2. Check the application logs:
 
 ```bash
 docker-compose logs taskpilot
 ```
 
-2. Verify environment variables are passed correctly:
+3. Verify environment variables are passed correctly:
 
 ```bash
 docker-compose exec taskpilot env
-```
-
-## Backup and Restore
-
-### Creating a Database Backup
-
-```bash
-docker-compose exec supabase-db pg_dump -U postgres -d taskpilot > taskpilot_backup.sql
-```
-
-### Restoring from Backup
-
-```bash
-cat taskpilot_backup.sql | docker-compose exec -T supabase-db psql -U postgres -d taskpilot
 ```
 
 ## Additional Resources
