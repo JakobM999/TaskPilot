@@ -74,10 +74,12 @@ This should display the tables in your TaskPilot database.
 Once everything is running, you can access TaskPilot at:
 
 ```
-http://your-server-ip
+http://your-server-ip:3030
 ```
 
-Replace `your-server-ip` with your server's IP address or domain name.
+Replace `your-server-ip` with your server's IP address or domain name. Note that TaskPilot runs on port 3030 to avoid conflicts with other services.
+
+The Supabase database is accessible on port 5435 (not directly accessible from outside unless specifically needed).
 
 ## Step 6: Update the Application (Manual Process)
 
@@ -105,6 +107,18 @@ docker-compose up -d --build
 This will rebuild the TaskPilot application with the latest changes.
 
 ## Troubleshooting
+
+### Port Conflicts
+
+If you see errors about ports being in use:
+
+1. Check if other services are using ports 3030 or 5435:
+```bash
+sudo lsof -i :3030
+sudo lsof -i :5435
+```
+
+2. If needed, you can modify the ports in docker-compose.yml to use different ones.
 
 ### Database Connection Issues
 

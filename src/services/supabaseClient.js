@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Get environment variables
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'http://localhost:5435';
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
 // Provide debugging information about the configuration
