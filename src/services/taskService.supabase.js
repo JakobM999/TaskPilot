@@ -69,6 +69,7 @@ export const getTasks = async (timeframe = 'today') => {
       description: task.description,
       dueDate: task.due_date,
       priority: task.priority,
+      category: task.category || 'work', // Default to work if not set
       completed: task.completed,
       escalated: task.escalated
     }));
@@ -194,6 +195,7 @@ export const createTask = async (task) => {
       description: task.description,
       due_date: formattedDate,
       priority: task.priority,
+      category: task.category || 'work',  // Default to work if not specified
       completed: false,
       escalated: false,
       user_id: user.id  // Make sure user_id is set
@@ -221,6 +223,7 @@ export const createTask = async (task) => {
       description: data.description,
       dueDate: data.due_date,
       priority: data.priority,
+      category: data.category || 'work',
       completed: data.completed,
       escalated: data.escalated
     };
@@ -235,7 +238,7 @@ export const createTask = async (task) => {
 // Update an existing task
 export const updateTask = async (task) => {
   try {
-    const { id, title, description, dueDate, priority, completed, escalated } = task;
+    const { id, title, description, dueDate, priority, category, completed, escalated } = task;
 
     // Format the date properly for PostgreSQL (YYYY-MM-DD)
     const formattedDate = format(new Date(dueDate), 'yyyy-MM-dd');
@@ -245,6 +248,7 @@ export const updateTask = async (task) => {
       description,
       due_date: formattedDate,
       priority,
+      category,
       completed: completed || false,
       escalated: escalated || false
     };
@@ -265,6 +269,7 @@ export const updateTask = async (task) => {
       description: data.description,
       dueDate: data.due_date,
       priority: data.priority,
+      category: data.category || 'work',
       completed: data.completed,
       escalated: data.escalated
     };
@@ -325,6 +330,7 @@ export const toggleTaskCompletion = async (taskId) => {
       description: data.description,
       dueDate: data.due_date,
       priority: data.priority,
+      category: data.category || 'work',
       completed: data.completed,
       escalated: data.escalated
     };
@@ -372,6 +378,7 @@ export const rescheduleTask = async (taskId) => {
       description: data.description,
       dueDate: data.due_date,
       priority: data.priority,
+      category: data.category || 'work',
       completed: data.completed,
       escalated: data.escalated
     };

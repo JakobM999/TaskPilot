@@ -35,6 +35,7 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import WarningIcon from '@mui/icons-material/Warning';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import CategoryIcon from '@mui/icons-material/Category';
 
 function TaskList({
   tasks = [], // Provide default empty array
@@ -55,8 +56,10 @@ function TaskList({
     description: '',
     dueDate: new Date().toISOString().split('T')[0], // Default to today
     priority: 'medium',
+    category: 'work', // Default to work
   });
   const [timeframe, setTimeframe] = useState(currentTimeframe);
+  const [categoryFilter, setCategoryFilter] = useState('work'); // Default to work
   const [taskSummary, setTaskSummary] = useState(null);
 
   const timeframeOptions = [
@@ -88,6 +91,7 @@ function TaskList({
       description: '',
       dueDate: new Date().toISOString().split('T')[0], // Default to today
       priority: 'medium',
+      category: 'work', // Default to work
     });
     setOpenDialog(true);
   };
@@ -245,6 +249,22 @@ function TaskList({
               ))}
             </Select>
           </FormControl>
+          <FormControl size="small">
+            <Select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              startAdornment={
+                <InputAdornment position="start">
+                  <CategoryIcon fontSize="small" />
+                </InputAdornment>
+              }
+              sx={{ minWidth: 120 }}
+            >
+              <MenuItem value="all">All Tasks</MenuItem>
+              <MenuItem value="work">Work</MenuItem>
+              <MenuItem value="private">Private</MenuItem>
+            </Select>
+          </FormControl>
           <Button 
             variant="contained" 
             startIcon={<AddIcon />}
@@ -264,7 +284,9 @@ function TaskList({
         </Box>
       ) : (
         <List sx={{ width: '100%' }}>
-          {sortTasks(tasks).map((task) => {
+          {sortTasks(tasks.filter(task => 
+            categoryFilter === 'all' || task.category === categoryFilter
+          )).map((task) => {
             const taskDate = new Date(task.dueDate);
             taskDate.setHours(0, 0, 0, 0);
             const today = new Date();
@@ -365,13 +387,18 @@ function TaskList({
                           color={getPriorityColor(task.priority)}
                           sx={{ textTransform: 'capitalize' }}
                         />
+                        <Chip
+                          label={task.category}
+                          size="small"
+                          color={task.category === 'work' ? 'primary' : 'secondary'}
+                          sx={{ textTransform: 'capitalize' }}
+                        />
                         {task.escalated && (
                           <Chip
                             label="Escalated"
                             size="small"
                             color="error"
                             icon={<WarningIcon />}
-                            sx={{ textTransform: 'capitalize' }}
                           />
                         )}
                       </Box>
@@ -472,6 +499,22 @@ function TaskList({
                   <MenuItem value="low">Low</MenuItem>
                   <MenuItem value="medium">Medium</MenuItem>
                   <MenuItem value="high">High</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel id="category-select-label">Category</InputLabel>
+                <Select
+                  labelId="category-select-label"
+                  id="category-select"
+                  name="category"
+                  value={currentTask.category}
+                  label="Category"
+                  onChange={handleInputChange}
+                >
+                  <MenuItem value="work">Work</MenuItem>
+                  <MenuItem value="private">Private</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

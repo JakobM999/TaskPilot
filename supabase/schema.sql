@@ -42,6 +42,7 @@ BEGIN
             description TEXT,
             due_date DATE NOT NULL,
             priority TEXT NOT NULL CHECK (priority IN ('low', 'medium', 'high')),
+            category TEXT NOT NULL DEFAULT 'work' CHECK (category IN ('work', 'private')),
             completed BOOLEAN NOT NULL DEFAULT FALSE,
             completed_at TIMESTAMP WITH TIME ZONE,
             escalated BOOLEAN NOT NULL DEFAULT FALSE,
