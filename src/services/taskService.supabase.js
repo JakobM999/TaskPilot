@@ -108,66 +108,50 @@ export const getTasks = async (timeframe = 'today') => {
       });
       return { data: sortByPriorityAndDueDate(filteredTasks), error: null };
     } else if (timeframe === 'tomorrow') {
-      // For 'tomorrow' timeframe, return tomorrow's tasks
+      // For 'tomorrow' timeframe, return overdue tasks and tomorrow's tasks
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       
-      return {
-        data: formattedTasks.filter(task => {
-          if (task.completed) return false;
-          
-          const taskDate = new Date(task.dueDate);
-          taskDate.setHours(0, 0, 0, 0);
-          
-          return taskDate.getTime() === tomorrow.getTime();
-        }),
-        error: null
-      };
+      const filteredTasks = formattedTasks.filter(task => {
+        if (task.completed) return false;
+        const taskDate = new Date(task.dueDate);
+        taskDate.setHours(0, 0, 0, 0);
+        return taskDate < today || taskDate.getTime() === tomorrow.getTime();
+      });
+      return { data: sortByPriorityAndDueDate(filteredTasks), error: null };
     } else if (timeframe === 'week') {
-      // For 'week' timeframe, return Next 7 Days tasks
+      // For 'week' timeframe, return overdue tasks and next 7 days tasks
       const weekEnd = new Date(today);
       weekEnd.setDate(weekEnd.getDate() + 7);
       
-      return {
-        data: formattedTasks.filter(task => {
-          if (task.completed) return false;
-          
-          const taskDate = new Date(task.dueDate);
-          taskDate.setHours(0, 0, 0, 0);
-          
-          return taskDate >= today && taskDate <= weekEnd;
-        }),
-        error: null
-      };
+      const filteredTasks = formattedTasks.filter(task => {
+        if (task.completed) return false;
+        const taskDate = new Date(task.dueDate);
+        taskDate.setHours(0, 0, 0, 0);
+        return taskDate < today || (taskDate >= today && taskDate <= weekEnd);
+      });
+      return { data: sortByPriorityAndDueDate(filteredTasks), error: null };
     } else if (timeframe === 'month') {
-      // For 'month' timeframe, return tasks for the next 30 days
+      // For 'month' timeframe, return overdue tasks and next 30 days tasks
       const thirtyDaysLater = new Date(today);
       thirtyDaysLater.setDate(today.getDate() + 30);
       
-      return {
-        data: formattedTasks.filter(task => {
-          if (task.completed) return false;
-          
-          const taskDate = new Date(task.dueDate);
-          taskDate.setHours(0, 0, 0, 0);
-          
-          return taskDate >= today && taskDate <= thirtyDaysLater;
-        }),
-        error: null
-      };
+      const filteredTasks = formattedTasks.filter(task => {
+        if (task.completed) return false;
+        const taskDate = new Date(task.dueDate);
+        taskDate.setHours(0, 0, 0, 0);
+        return taskDate < today || (taskDate >= today && taskDate <= thirtyDaysLater);
+      });
+      return { data: sortByPriorityAndDueDate(filteredTasks), error: null };
     } else if (timeframe === 'overdue') {
       // For 'overdue' timeframe, return only overdue tasks
-      return {
-        data: formattedTasks.filter(task => {
-          if (task.completed) return false;
-          
-          const taskDate = new Date(task.dueDate);
-          taskDate.setHours(0, 0, 0, 0);
-          
-          return taskDate < today;
-        }),
-        error: null
-      };
+      const filteredTasks = formattedTasks.filter(task => {
+        if (task.completed) return false;
+        const taskDate = new Date(task.dueDate);
+        taskDate.setHours(0, 0, 0, 0);
+        return taskDate < today;
+      });
+      return { data: sortByPriorityAndDueDate(filteredTasks), error: null };
     }
 
     // Return all tasks sorted by priority and due date
