@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Frontend React application
   taskpilot:
     build: .
     container_name: taskpilot-app
@@ -11,7 +10,7 @@ services:
     environment:
       - NODE_ENV=production
       - REACT_APP_SUPABASE_URL=http://192.168.0.195:8000
-      - REACT_APP_SUPABASE_ANON_KEY=${REACT_APP_SUPABASE_ANON_KEY}
+      - REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogImFub24iLAogICJpc3MiOiAic3VwYWJhc2UiLAogICJpYXQiOiAxNzQwNjEwODAwLAogICJleHAiOiAxODk4Mzc3MjAwCn0.A-NMpmKe_ORXXHpiBxJmJcMvlcL0STaJuyd708gotO8
 
 volumes:
   supabase-data:
