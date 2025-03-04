@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -19,6 +19,12 @@ import {
   ListSubheader,
   Stack,
   Collapse,
+  Checkbox,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Brightness4 as DarkModeIcon,
@@ -34,11 +40,130 @@ import {
   ExpandLess as ExpandLessIcon,
   Storage as StorageIcon,
   Help as HelpIcon,
+  ConstructionOutlined as ConstructionIcon,
+  Category as CategoryIcon,
+  AccessTime as TimeIcon,
+  Layers as LayersIcon,
+  Analytics as AnalyticsIcon,
+  IntegrationInstructions as IntegrationIcon,
+  Settings as SettingsIcon,
+  Engineering as EngineeringIcon,
 } from '@mui/icons-material';
 import { testSupabaseConnection } from '../services/testSupabase';
 import { verifySupabaseSchema } from '../services/verifySchema';
 
+// Tab panel component to wrap content for each tab
+function TabPanel(props) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`settings-tabpanel-${index}`}
+      aria-labelledby={`settings-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+// Feature Upgrades component for the dedicated tab
+function FeatureUpgrades({ featureUpgrades, handleToggleFeature }) {
+  // Calculate progress for feature upgrade categories
+  const calculateProgress = (category) => {
+    const tasks = featureUpgrades[category].tasks;
+    const completedCount = tasks.filter(task => task.completed).length;
+    return {
+      count: completedCount,
+      total: tasks.length,
+      percentage: Math.round((completedCount / tasks.length) * 100)
+    };
+  };
+
+  // Calculate overall progress
+  const calculateOverallProgress = () => {
+    let totalTasks = 0;
+    let completedTasks = 0;
+    
+    Object.keys(featureUpgrades).forEach(category => {
+      const tasks = featureUpgrades[category].tasks;
+      totalTasks += tasks.length;
+      completedTasks += tasks.filter(task => task.completed).length;
+    });
+    
+    return {
+      count: completedTasks,
+      total: totalTasks,
+      percentage: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+    };
+  };
+
+  return (
+    <>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <ConstructionIcon color="primary" />
+        <Typography variant="h5" component="h2">
+          Feature Upgrades To-Do List
+        </Typography>
+      </Box>
+      
+      <Typography variant="body1" paragraph>
+        Track your progress implementing new features and improvements to TaskPilot.
+        Overall progress: {calculateOverallProgress().count}/{calculateOverallProgress().total} ({calculateOverallProgress().percentage}% complete)
+      </Typography>
+      
+      {Object.keys(featureUpgrades).map((category) => (
+        <Accordion key={category} defaultExpanded={true}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+              {category === 'organization' && <CategoryIcon color="primary" />}
+              {category === 'timeManagement' && <TimeIcon color="primary" />}
+              {category === 'userExperience' && <LayersIcon color="primary" />}
+              {category === 'ai' && <SmartToyIcon color="primary" />}
+              {category === 'integration' && <IntegrationIcon color="primary" />}
+              {category === 'analytics' && <AnalyticsIcon color="primary" />}
+              
+              <Typography variant="h6">{featureUpgrades[category].title}</Typography>
+              
+              <Typography variant="body2" sx={{ ml: 'auto' }}>
+                {calculateProgress(category).count}/{calculateProgress(category).total} completed
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails>
+            <List dense>
+              {featureUpgrades[category].tasks.map((task) => (
+                <ListItem key={task.id} disablePadding>
+                  <FormControlLabel
+                    control={
+                      <Checkbox 
+                        checked={task.completed}
+                        onChange={() => handleToggleFeature(category, task.id)}
+                        color="primary"
+                      />
+                    }
+                    label={task.text}
+                    sx={{ width: '100%', ml: 0.5 }}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </AccordionDetails>
+        </Accordion>
+      ))}
+    </>
+  );
+}
+
 function Settings() {
+  const [currentTab, setCurrentTab] = useState(0);
+  
   // Theme settings
   const [darkMode, setDarkMode] = useState(false);
   const [language, setLanguage] = useState('en');
@@ -64,6 +189,64 @@ function Settings() {
   const [calendarSync, setCalendarSync] = useState(true);
   const [blockCalendarEvents, setBlockCalendarEvents] = useState(true);
 
+  // Feature upgrade to-do list
+  const [featureUpgrades, setFeatureUpgrades] = useState({
+    organization: {
+      title: "Task Organization & Display",
+      tasks: [
+        { id: "categories", text: "Task Categorization", completed: false },
+        { id: "dependencies", text: "Task Dependencies", completed: false },
+        { id: "priority-visual", text: "Improved Priority Visualization", completed: false },
+        { id: "sorting", text: "Advanced Task Sorting & Filtering", completed: false }
+      ]
+    },
+    timeManagement: {
+      title: "Time Management",
+      tasks: [
+        { id: "time-estimates", text: "Time Estimates for Tasks", completed: false },
+        { id: "progress", text: "Partial Progress Tracking", completed: false },
+        { id: "pomodoro", text: "Pomodoro Timer Integration", completed: false },
+        { id: "recurring", text: "Recurring Tasks Support", completed: false }
+      ]
+    },
+    userExperience: {
+      title: "User Experience",
+      tasks: [
+        { id: "drag-drop", text: "Drag & Drop Interface", completed: false },
+        { id: "templates", text: "Task Templates", completed: false },
+        { id: "bulk-actions", text: "Bulk Actions", completed: false },
+        { id: "keyboard", text: "Keyboard Shortcuts", completed: false },
+        { id: "dark-mode", text: "Dark Mode Toggle", completed: false }
+      ]
+    },
+    ai: {
+      title: "AI & Smart Features",
+      tasks: [
+        { id: "smart-suggestions", text: "Smarter Task Suggestions", completed: false },
+        { id: "nlp", text: "Natural Language Processing", completed: false },
+        { id: "auto-priority", text: "Automated Priority Setting", completed: false },
+        { id: "smart-notifications", text: "Smart Notifications", completed: false }
+      ]
+    },
+    integration: {
+      title: "Integration & Expansion",
+      tasks: [
+        { id: "calendar", text: "Improved Calendar Integration", completed: false },
+        { id: "team", text: "Team Tasks & Collaboration", completed: false },
+        { id: "mobile", text: "Mobile App", completed: false },
+        { id: "api", text: "API Access", completed: false }
+      ]
+    },
+    analytics: {
+      title: "Analytics & Insights",
+      tasks: [
+        { id: "dashboard", text: "Productivity Dashboard", completed: false },
+        { id: "goals", text: "Goal Tracking", completed: false },
+        { id: "heatmap", text: "Task Completion Heatmap", completed: false }
+      ]
+    }
+  });
+
   const [saveStatus, setSaveStatus] = useState(null);
 
   const [testResult, setTestResult] = useState(null);
@@ -72,9 +255,59 @@ function Settings() {
   const [isLoading, setIsLoading] = useState(false);
   const [showDatabaseDetails, setShowDatabaseDetails] = useState(false);
 
+  // Load saved feature upgrades from localStorage on component mount
+  useEffect(() => {
+    const savedUpgrades = localStorage.getItem('taskpilot_feature_upgrades');
+    if (savedUpgrades) {
+      try {
+        const parsedUpgrades = JSON.parse(savedUpgrades);
+        setFeatureUpgrades(prevState => {
+          // Merge the saved state with the current structure to handle new features
+          const updatedState = { ...prevState };
+          
+          // Update completed status for each task
+          Object.keys(parsedUpgrades).forEach(category => {
+            if (updatedState[category]) {
+              parsedUpgrades[category].tasks.forEach(savedTask => {
+                const taskIndex = updatedState[category].tasks.findIndex(t => t.id === savedTask.id);
+                if (taskIndex !== -1) {
+                  updatedState[category].tasks[taskIndex].completed = savedTask.completed;
+                }
+              });
+            }
+          });
+          
+          return updatedState;
+        });
+      } catch (error) {
+        console.error('Error loading saved feature upgrades:', error);
+      }
+    }
+  }, []);
+
+  const handleToggleFeature = (category, taskId) => {
+    setFeatureUpgrades(prevState => {
+      const newState = { ...prevState };
+      const categoryTasks = newState[category].tasks;
+      const taskIndex = categoryTasks.findIndex(t => t.id === taskId);
+      
+      if (taskIndex !== -1) {
+        categoryTasks[taskIndex].completed = !categoryTasks[taskIndex].completed;
+      }
+      
+      // Save to localStorage after updating
+      localStorage.setItem('taskpilot_feature_upgrades', JSON.stringify(newState));
+      
+      return newState;
+    });
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setCurrentTab(newValue);
+  };
+
   const handleSave = () => {
-    // Here we'll save to local storage for now
-    // Later this will be integrated with Supabase
+    // Save all settings including feature upgrades
     const settings = {
       appearance: { darkMode, language },
       notifications: { emailNotifications, desktopNotifications, reminderTime },
@@ -94,6 +327,8 @@ function Settings() {
     };
 
     localStorage.setItem('taskpilot_settings', JSON.stringify(settings));
+    localStorage.setItem('taskpilot_feature_upgrades', JSON.stringify(featureUpgrades));
+    
     setSaveStatus('success');
     setTimeout(() => setSaveStatus(null), 3000);
   };
@@ -175,395 +410,451 @@ function Settings() {
       )}
 
       <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3, mb: 3 }}>
-            <List subheader={
-              <ListSubheader sx={{ bgcolor: 'transparent', pl: 0 }}>
-                <Typography variant="h6" component="h2" gutterBottom>
-                  Appearance & Language
-                </Typography>
-              </ListSubheader>
-            }>
-              <ListItem>
-                <ListItemIcon>
-                  <DarkModeIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Dark Mode" 
-                  secondary="Switch between light and dark theme"
-                />
-                <Switch
-                  checked={darkMode}
-                  onChange={(e) => setDarkMode(e.target.checked)}
-                />
-              </ListItem>
-
-              <ListItem>
-                <ListItemIcon>
-                  <LanguageIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Language" 
-                  secondary="Choose your preferred language"
-                />
-                <Select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  size="small"
-                  sx={{ width: 120 }}
-                >
-                  <MenuItem value="en">English</MenuItem>
-                  <MenuItem value="es">Español</MenuItem>
-                  <MenuItem value="fr">Français</MenuItem>
-                </Select>
-              </ListItem>
-            </List>
-
-            <Divider sx={{ my: 2 }} />
-
-            <List subheader={
-              <ListSubheader sx={{ bgcolor: 'transparent', pl: 0 }}>
-                <Typography variant="h6" component="h2" gutterBottom>
-                  Notifications
-                </Typography>
-              </ListSubheader>
-            }>
-              <ListItem>
-                <ListItemIcon>
-                  <NotificationsIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Email Notifications" 
-                  secondary="Receive task reminders via email"
-                />
-                <Switch
-                  checked={emailNotifications}
-                  onChange={(e) => setEmailNotifications(e.target.checked)}
-                />
-              </ListItem>
-
-              <ListItem>
-                <ListItemIcon>
-                  <NotificationsIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Desktop Notifications" 
-                  secondary="Show notifications on your desktop"
-                />
-                <Switch
-                  checked={desktopNotifications}
-                  onChange={(e) => setDesktopNotifications(e.target.checked)}
-                />
-              </ListItem>
-
-              <ListItem>
-                <ListItemIcon>
-                  <TimerIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Reminder Time" 
-                  secondary="Minutes before task due time"
-                />
-                <TextField
-                  type="number"
-                  value={reminderTime}
-                  onChange={(e) => setReminderTime(Number(e.target.value))}
-                  size="small"
-                  sx={{ width: 80 }}
-                  InputProps={{ inputProps: { min: 5, max: 60 } }}
-                />
-              </ListItem>
-            </List>
-
-            <Divider sx={{ my: 2 }} />
-
-            <List subheader={
-              <ListSubheader sx={{ bgcolor: 'transparent', pl: 0 }}>
-                <Typography variant="h6" component="h2" gutterBottom>
-                  Task Management
-                </Typography>
-              </ListSubheader>
-            }>
-              <ListItem>
-                <ListItemIcon>
-                  <AccessTimeIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Working Hours" 
-                  secondary="Set your typical working hours"
-                />
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                  <TextField
-                    type="time"
-                    value={workingHoursStart}
-                    onChange={(e) => setWorkingHoursStart(e.target.value)}
-                    size="small"
-                  />
-                  <Typography variant="body2">to</Typography>
-                  <TextField
-                    type="time"
-                    value={workingHoursEnd}
-                    onChange={(e) => setWorkingHoursEnd(e.target.value)}
-                    size="small"
-                  />
-                </Box>
-              </ListItem>
-
-              <ListItem>
-                <ListItemIcon>
-                  <ScheduleIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Default Task Duration" 
-                  secondary="Minutes allocated for new tasks"
-                />
-                <TextField
-                  type="number"
-                  value={defaultTaskDuration}
-                  onChange={(e) => setDefaultTaskDuration(Number(e.target.value))}
-                  size="small"
-                  sx={{ width: 80 }}
-                  InputProps={{ inputProps: { min: 15, max: 480 } }}
-                />
-              </ListItem>
-
-              <ListItem>
-                <ListItemIcon>
-                  <TimerIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Auto-escalate Overdue Tasks" 
-                  secondary="Automatically increase priority of overdue tasks"
-                />
-                <Switch
-                  checked={autoEscalateOverdue}
-                  onChange={(e) => setAutoEscalateOverdue(e.target.checked)}
-                />
-              </ListItem>
-            </List>
-
-            <Divider sx={{ my: 2 }} />
-
-            <List subheader={
-              <ListSubheader sx={{ bgcolor: 'transparent', pl: 0 }}>
-                <Typography variant="h6" component="h2" gutterBottom>
-                  AI Assistant
-                </Typography>
-              </ListSubheader>
-            }>
-              <ListItem>
-                <ListItemIcon>
-                  <SmartToyIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="AI Assistant" 
-                  secondary="Enable AI-powered suggestions and analysis"
-                />
-                <Switch
-                  checked={aiEnabled}
-                  onChange={(e) => setAiEnabled(e.target.checked)}
-                />
-              </ListItem>
-
-              <ListItem>
-                <ListItemIcon>
-                  <TimerIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Suggestion Frequency" 
-                  secondary="How often AI provides suggestions"
-                />
-                <Select
-                  value={aiSuggestionFrequency}
-                  onChange={(e) => setAiSuggestionFrequency(e.target.value)}
-                  size="small"
-                  sx={{ width: 120 }}
-                >
-                  <MenuItem value="low">Low</MenuItem>
-                  <MenuItem value="medium">Medium</MenuItem>
-                  <MenuItem value="high">High</MenuItem>
-                </Select>
-              </ListItem>
-
-              <ListItem>
-                <ListItemIcon>
-                  <TimerIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Focus Time Length" 
-                  secondary="Minutes per Pomodoro session"
-                />
-                <TextField
-                  type="number"
-                  value={focusTimeLength}
-                  onChange={(e) => setFocusTimeLength(Number(e.target.value))}
-                  size="small"
-                  sx={{ width: 80 }}
-                  InputProps={{ inputProps: { min: 15, max: 60 } }}
-                />
-              </ListItem>
-
-              <ListItem>
-                <ListItemIcon>
-                  <TimerIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Break Time Length" 
-                  secondary="Minutes per break"
-                />
-                <TextField
-                  type="number"
-                  value={breakTimeLength}
-                  onChange={(e) => setBreakTimeLength(Number(e.target.value))}
-                  size="small"
-                  sx={{ width: 80 }}
-                  InputProps={{ inputProps: { min: 3, max: 15 } }}
-                />
-              </ListItem>
-            </List>
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, mb: 3, position: 'sticky', top: 88 }}>
-            <Typography variant="h6" gutterBottom>
-              Actions
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Button
-                variant="contained"
-                startIcon={<SaveIcon />}
-                onClick={handleSave}
-                fullWidth
-              >
-                Save Changes
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<RestartAltIcon />}
-                onClick={handleReset}
-                fullWidth
-              >
-                Reset to Defaults
-              </Button>
-            </Box>
-
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Calendar Integration
-              </Typography>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={calendarSync}
-                    onChange={(e) => setCalendarSync(e.target.checked)}
-                  />
-                }
-                label="Sync with Outlook Calendar"
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={blockCalendarEvents}
-                    onChange={(e) => setBlockCalendarEvents(e.target.checked)}
-                  />
-                }
-                label="Block calendar during focus time"
-              />
-            </Box>
-          </Paper>
-        </Grid>
-
         <Grid item xs={12}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <StorageIcon />
-              Database Connection
-            </Typography>
-
-            <Stack spacing={2}>
-              <Button
-                variant="outlined"
-                onClick={handleTestConnection}
-                disabled={isLoading}
-                startIcon={<StorageIcon />}
+          <Paper sx={{ width: '100%' }}>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+              <Tabs 
+                value={currentTab} 
+                onChange={handleTabChange} 
+                variant="scrollable"
+                scrollButtons="auto"
               >
-                Test Database Connection
-              </Button>
+                <Tab 
+                  icon={<SettingsIcon />} 
+                  iconPosition="start" 
+                  label="General" 
+                />
+                <Tab 
+                  icon={<EngineeringIcon />} 
+                  iconPosition="start" 
+                  label="Feature Upgrades" 
+                />
+                <Tab 
+                  icon={<StorageIcon />} 
+                  iconPosition="start" 
+                  label="Database" 
+                />
+              </Tabs>
+            </Box>
 
-              <Button
-                variant="outlined"
-                onClick={handleVerifySchema}
-                disabled={isLoading}
-                startIcon={<StorageIcon />}
-              >
-                Verify Database Schema
-              </Button>
+            {/* General Settings Tab */}
+            <TabPanel value={currentTab} index={0}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={8}>
+                  <Paper sx={{ p: 3, mb: 3 }}>
+                    {/* Existing settings sections */}
+                    <List subheader={
+                      <ListSubheader sx={{ bgcolor: 'transparent', pl: 0 }}>
+                        <Typography variant="h6" component="h2" gutterBottom>
+                          Appearance & Language
+                        </Typography>
+                      </ListSubheader>
+                    }>
+                      <ListItem>
+                        <ListItemIcon>
+                          <DarkModeIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Dark Mode" 
+                          secondary="Switch between light and dark theme"
+                        />
+                        <Switch
+                          checked={darkMode}
+                          onChange={(e) => setDarkMode(e.target.checked)}
+                        />
+                      </ListItem>
 
-              {testResult && (
-                <Alert severity={testResult.success ? "success" : "error"}>
-                  <Typography variant="subtitle1" fontWeight="bold">
-                    {testResult.success ? "Connection Successful" : "Connection Failed"}
-                  </Typography>
-                  <Typography variant="body2">
-                    {testResult.message || (testResult.success ? "Successfully connected to database!" : "Failed to connect to database.")}
-                  </Typography>
-                </Alert>
-              )}
+                      <ListItem>
+                        <ListItemIcon>
+                          <LanguageIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Language" 
+                          secondary="Choose your preferred language"
+                        />
+                        <Select
+                          value={language}
+                          onChange={(e) => setLanguage(e.target.value)}
+                          size="small"
+                          sx={{ width: 120 }}
+                        >
+                          <MenuItem value="en">English</MenuItem>
+                          <MenuItem value="es">Español</MenuItem>
+                          <MenuItem value="fr">Français</MenuItem>
+                        </Select>
+                      </ListItem>
+                    </List>
 
-              {schemaResult && (
-                <Alert severity={schemaResult.success ? "success" : "error"}>
-                  <Typography variant="subtitle1" fontWeight="bold">
-                    {schemaResult.success ? "Schema Verification Successful" : "Schema Verification Failed"}
-                  </Typography>
-                  <Typography variant="body2">
-                    {schemaResult.message}
-                  </Typography>
-                </Alert>
-              )}
+                    <Divider sx={{ my: 2 }} />
 
-              {(testError || (!testResult?.success && !schemaResult?.success)) && (
-                <>
+                    <List subheader={
+                      <ListSubheader sx={{ bgcolor: 'transparent', pl: 0 }}>
+                        <Typography variant="h6" component="h2" gutterBottom>
+                          Notifications
+                        </Typography>
+                      </ListSubheader>
+                    }>
+                      <ListItem>
+                        <ListItemIcon>
+                          <NotificationsIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Email Notifications" 
+                          secondary="Receive task reminders via email"
+                        />
+                        <Switch
+                          checked={emailNotifications}
+                          onChange={(e) => setEmailNotifications(e.target.checked)}
+                        />
+                      </ListItem>
+
+                      <ListItem>
+                        <ListItemIcon>
+                          <NotificationsIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Desktop Notifications" 
+                          secondary="Show notifications on your desktop"
+                        />
+                        <Switch
+                          checked={desktopNotifications}
+                          onChange={(e) => setDesktopNotifications(e.target.checked)}
+                        />
+                      </ListItem>
+
+                      <ListItem>
+                        <ListItemIcon>
+                          <TimerIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Reminder Time" 
+                          secondary="Minutes before task due time"
+                        />
+                        <TextField
+                          type="number"
+                          value={reminderTime}
+                          onChange={(e) => setReminderTime(Number(e.target.value))}
+                          size="small"
+                          sx={{ width: 80 }}
+                          InputProps={{ inputProps: { min: 5, max: 60 } }}
+                        />
+                      </ListItem>
+                    </List>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    <List subheader={
+                      <ListSubheader sx={{ bgcolor: 'transparent', pl: 0 }}>
+                        <Typography variant="h6" component="h2" gutterBottom>
+                          Task Management
+                        </Typography>
+                      </ListSubheader>
+                    }>
+                      <ListItem>
+                        <ListItemIcon>
+                          <AccessTimeIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Working Hours" 
+                          secondary="Set your typical working hours"
+                        />
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                          <TextField
+                            type="time"
+                            value={workingHoursStart}
+                            onChange={(e) => setWorkingHoursStart(e.target.value)}
+                            size="small"
+                          />
+                          <Typography variant="body2">to</Typography>
+                          <TextField
+                            type="time"
+                            value={workingHoursEnd}
+                            onChange={(e) => setWorkingHoursEnd(e.target.value)}
+                            size="small"
+                          />
+                        </Box>
+                      </ListItem>
+
+                      <ListItem>
+                        <ListItemIcon>
+                          <ScheduleIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Default Task Duration" 
+                          secondary="Minutes allocated for new tasks"
+                        />
+                        <TextField
+                          type="number"
+                          value={defaultTaskDuration}
+                          onChange={(e) => setDefaultTaskDuration(Number(e.target.value))}
+                          size="small"
+                          sx={{ width: 80 }}
+                          InputProps={{ inputProps: { min: 15, max: 480 } }}
+                        />
+                      </ListItem>
+
+                      <ListItem>
+                        <ListItemIcon>
+                          <TimerIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Auto-escalate Overdue Tasks" 
+                          secondary="Automatically increase priority of overdue tasks"
+                        />
+                        <Switch
+                          checked={autoEscalateOverdue}
+                          onChange={(e) => setAutoEscalateOverdue(e.target.checked)}
+                        />
+                      </ListItem>
+                    </List>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    <List subheader={
+                      <ListSubheader sx={{ bgcolor: 'transparent', pl: 0 }}>
+                        <Typography variant="h6" component="h2" gutterBottom>
+                          AI Assistant
+                        </Typography>
+                      </ListSubheader>
+                    }>
+                      <ListItem>
+                        <ListItemIcon>
+                          <SmartToyIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="AI Assistant" 
+                          secondary="Enable AI-powered suggestions and analysis"
+                        />
+                        <Switch
+                          checked={aiEnabled}
+                          onChange={(e) => setAiEnabled(e.target.checked)}
+                        />
+                      </ListItem>
+
+                      <ListItem>
+                        <ListItemIcon>
+                          <TimerIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Suggestion Frequency" 
+                          secondary="How often AI provides suggestions"
+                        />
+                        <Select
+                          value={aiSuggestionFrequency}
+                          onChange={(e) => setAiSuggestionFrequency(e.target.value)}
+                          size="small"
+                          sx={{ width: 120 }}
+                        >
+                          <MenuItem value="low">Low</MenuItem>
+                          <MenuItem value="medium">Medium</MenuItem>
+                          <MenuItem value="high">High</MenuItem>
+                        </Select>
+                      </ListItem>
+
+                      <ListItem>
+                        <ListItemIcon>
+                          <TimerIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Focus Time Length" 
+                          secondary="Minutes per Pomodoro session"
+                        />
+                        <TextField
+                          type="number"
+                          value={focusTimeLength}
+                          onChange={(e) => setFocusTimeLength(Number(e.target.value))}
+                          size="small"
+                          sx={{ width: 80 }}
+                          InputProps={{ inputProps: { min: 15, max: 60 } }}
+                        />
+                      </ListItem>
+
+                      <ListItem>
+                        <ListItemIcon>
+                          <TimerIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Break Time Length" 
+                          secondary="Minutes per break"
+                        />
+                        <TextField
+                          type="number"
+                          value={breakTimeLength}
+                          onChange={(e) => setBreakTimeLength(Number(e.target.value))}
+                          size="small"
+                          sx={{ width: 80 }}
+                          InputProps={{ inputProps: { min: 3, max: 15 } }}
+                        />
+                      </ListItem>
+                    </List>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} md={4}>
+                  <Paper sx={{ p: 3, mb: 3, position: 'sticky', top: 88 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Actions
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Button
+                        variant="contained"
+                        startIcon={<SaveIcon />}
+                        onClick={handleSave}
+                        fullWidth
+                      >
+                        Save Changes
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        startIcon={<RestartAltIcon />}
+                        onClick={handleReset}
+                        fullWidth
+                      >
+                        Reset to Defaults
+                      </Button>
+                    </Box>
+
+                    <Box sx={{ mt: 3 }}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Calendar Integration
+                      </Typography>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={calendarSync}
+                            onChange={(e) => setCalendarSync(e.target.checked)}
+                          />
+                        }
+                        label="Sync with Outlook Calendar"
+                      />
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={blockCalendarEvents}
+                            onChange={(e) => setBlockCalendarEvents(e.target.checked)}
+                          />
+                        }
+                        label="Block calendar during focus time"
+                      />
+                    </Box>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </TabPanel>
+
+            {/* Feature Upgrades Tab */}
+            <TabPanel value={currentTab} index={1}>
+              <Paper sx={{ p: 3 }}>
+                <FeatureUpgrades 
+                  featureUpgrades={featureUpgrades}
+                  handleToggleFeature={handleToggleFeature}
+                />
+
+                <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
                   <Button
-                    fullWidth
-                    sx={{ mt: 2 }}
-                    endIcon={showDatabaseDetails ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                    onClick={() => setShowDatabaseDetails(!showDatabaseDetails)}
+                    variant="contained"
+                    startIcon={<SaveIcon />}
+                    onClick={handleSave}
                   >
-                    {showDatabaseDetails ? 'Hide Troubleshooting' : 'Show Troubleshooting'}
+                    Save Upgrade Progress
+                  </Button>
+                </Box>
+              </Paper>
+            </TabPanel>
+
+            {/* Database Tab */}
+            <TabPanel value={currentTab} index={2}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <StorageIcon />
+                  Database Connection
+                </Typography>
+
+                <Stack spacing={2}>
+                  <Button
+                    variant="outlined"
+                    onClick={handleTestConnection}
+                    disabled={isLoading}
+                    startIcon={<StorageIcon />}
+                  >
+                    Test Database Connection
                   </Button>
 
-                  <Collapse in={showDatabaseDetails}>
-                    <Paper sx={{ p: 3 }} variant="outlined">
-                      <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <HelpIcon color="info" />
-                        Troubleshooting Steps
+                  <Button
+                    variant="outlined"
+                    onClick={handleVerifySchema}
+                    disabled={isLoading}
+                    startIcon={<StorageIcon />}
+                  >
+                    Verify Database Schema
+                  </Button>
+
+                  {testResult && (
+                    <Alert severity={testResult.success ? "success" : "error"}>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        {testResult.success ? "Connection Successful" : "Connection Failed"}
                       </Typography>
-                      <List>
-                        <ListItem>
-                          <ListItemText 
-                            primary="Check if Database is Running" 
-                            secondary="Make sure your database server is running at the URL you specified." 
-                          />
-                        </ListItem>
-                        <ListItem>
-                          <ListItemText 
-                            primary="Verify API Key" 
-                            secondary="Double-check that you've copied the correct API key from your dashboard." 
-                          />
-                        </ListItem>
-                        <ListItem>
-                          <ListItemText 
-                            primary="Run Database Schema" 
-                            secondary="Make sure to run the schema.sql script to create all necessary tables." 
-                          />
-                        </ListItem>
-                      </List>
-                    </Paper>
-                  </Collapse>
-                </>
-              )}
-            </Stack>
+                      <Typography variant="body2">
+                        {testResult.message || (testResult.success ? "Successfully connected to database!" : "Failed to connect to database.")}
+                      </Typography>
+                    </Alert>
+                  )}
+
+                  {schemaResult && (
+                    <Alert severity={schemaResult.success ? "success" : "error"}>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        {schemaResult.success ? "Schema Verification Successful" : "Schema Verification Failed"}
+                      </Typography>
+                      <Typography variant="body2">
+                        {schemaResult.message}
+                      </Typography>
+                    </Alert>
+                  )}
+
+                  {(testError || (!testResult?.success && !schemaResult?.success)) && (
+                    <>
+                      <Button
+                        fullWidth
+                        sx={{ mt: 2 }}
+                        endIcon={showDatabaseDetails ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                        onClick={() => setShowDatabaseDetails(!showDatabaseDetails)}
+                      >
+                        {showDatabaseDetails ? 'Hide Troubleshooting' : 'Show Troubleshooting'}
+                      </Button>
+
+                      <Collapse in={showDatabaseDetails}>
+                        <Paper sx={{ p: 3 }} variant="outlined">
+                          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <HelpIcon color="info" />
+                            Troubleshooting Steps
+                          </Typography>
+                          <List>
+                            <ListItem>
+                              <ListItemText 
+                                primary="Check if Database is Running" 
+                                secondary="Make sure your database server is running at the URL you specified." 
+                              />
+                            </ListItem>
+                            <ListItem>
+                              <ListItemText 
+                                primary="Verify API Key" 
+                                secondary="Double-check that you've copied the correct API key from your dashboard." 
+                              />
+                            </ListItem>
+                            <ListItem>
+                              <ListItemText 
+                                primary="Run Database Schema" 
+                                secondary="Make sure to run the schema.sql script to create all necessary tables." 
+                              />
+                            </ListItem>
+                          </List>
+                        </Paper>
+                      </Collapse>
+                    </>
+                  )}
+                </Stack>
+              </Paper>
+            </TabPanel>
           </Paper>
         </Grid>
       </Grid>
