@@ -6,10 +6,10 @@ import { Box, CircularProgress } from '@mui/material';
 
 // Components
 import Login from './components/Login';
-import Dashboard from './components/Dashboard';
+import Tasks from './components/Tasks';
 
 // Services
-import { getCurrentUser } from './services/authService';
+import { getCurrentUser } from './services/index';
 
 // Custom theme
 const theme = createTheme({
@@ -141,7 +141,7 @@ function App() {
             user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
           } />
           <Route path="/" element={
-            user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
+            user ? <Tasks user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
           } />
         </Routes>
       </Router>

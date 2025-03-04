@@ -42,7 +42,7 @@ function Tasks({ user, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currentTimeframe, setCurrentTimeframe] = useState('today');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('tasks');
   const theme = useTheme();
 
   // Fetch tasks and initial AI advice
@@ -58,15 +58,13 @@ function Tasks({ user, onLogout }) {
         if (taskError) {
           console.error('Error fetching tasks:', taskError);
         } else {
-          // Don't filter tasks here anymore, as it's handled in taskService
           setTasks(taskData || []);
           
-          // Get initial AI advice
           const { data: aiData } = await getTaskManagementAdvice();
           if (!mounted) setAiSuggestion(aiData?.advice || "Let's help you stay focused and productive today.");
         }
       } catch (err) {
-        console.error('Error in dashboard:', err);
+        console.error('Error in tasks view:', err);
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -209,15 +207,15 @@ function Tasks({ user, onLogout }) {
       <List>
         <ListItem 
           button 
-          onClick={() => setActiveTab('dashboard')}
-          selected={activeTab === 'dashboard'}
+          onClick={() => setActiveTab('tasks')}
+          selected={activeTab === 'tasks'}
         >
           <ListItemIcon>
-            <Tooltip title="Dashboard" placement="right">
+            <Tooltip title="Tasks" placement="right">
               <DashboardIcon />
             </Tooltip>
           </ListItemIcon>
-          {!sidebarCollapsed && <ListItemText primary="Dashboard" />}
+          {!sidebarCollapsed && <ListItemText primary="Tasks" />}
         </ListItem>
         <ListItem 
           button 

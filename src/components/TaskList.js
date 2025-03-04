@@ -62,8 +62,8 @@ function TaskList({
   const timeframeOptions = [
     { value: 'today', label: 'Today' },
     { value: 'tomorrow', label: 'Tomorrow' },
-    { value: 'week', label: 'This Week' },
-    { value: 'month', label: 'This Month' },
+    { value: 'week', label: 'Next 7 Days' },
+    { value: 'month', label: 'Next 30 Days' },
     { value: 'upcoming', label: 'Upcoming' },
     { value: 'overdue', label: 'Overdue' }
   ];
@@ -243,7 +243,12 @@ function TaskList({
       ) : (
         <List sx={{ width: '100%' }}>
           {sortTasks(tasks).map((task) => {
-            const isOverdue = new Date(task.dueDate) < new Date() && !task.completed;
+            const taskDate = new Date(task.dueDate);
+            taskDate.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            // Only consider a task overdue if its due date is strictly before today
+            const isOverdue = taskDate < today && !task.completed;
             
             return (
               <React.Fragment key={task.id}>
@@ -364,11 +369,11 @@ function TaskList({
                         </Typography>
                         <Typography 
                           variant="caption" 
-                          color={new Date(task.dueDate) < new Date() && !task.completed ? 'error.main' : 'text.secondary'}
+                          color={isOverdue ? 'error.main' : 'text.secondary'}
                           sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
                         >
                           Due: {new Date(task.dueDate).toLocaleDateString('da-DK')}
-                          {new Date(task.dueDate) < new Date() && !task.completed && (
+                          {isOverdue && (
                             <span>(Overdue)</span>
                           )}
                         </Typography>

@@ -48,6 +48,9 @@ export const getTasks = async (timeframe = 'today') => {
     if (autoEscalateEnabled) {
       for (const task of allTasks) {
         const taskDate = new Date(task.due_date);
+        taskDate.setHours(0, 0, 0, 0);
+        
+        // Only auto-escalate if task is strictly before today (not if it's due today)
         if (!task.completed && taskDate < today && !task.escalated) {
           // Auto-escalate the overdue task
           await supabase
@@ -71,6 +74,86 @@ export const getTasks = async (timeframe = 'today') => {
     }));
 
     console.log('Formatted tasks:', formattedTasks);
+
+    // Filter tasks based on timeframe
+    if (timeframe === 'today') {
+      // For 'today' timeframe, only return today's tasks and overdue tasks
+      return {
+        data: formattedTasks.filter(task => {
+          if (task.completed) return false;
+          
+          const taskDate = new Date(task.dueDate);
+          taskDate.setHours(0, 0, 0, 0);
+          
+          // Show task if it's due today or overdue
+          return taskDate.getTime() <= today.getTime();
+        }),
+        error: null
+      };
+    } else if (timeframe === 'tomorrow') {
+      // For 'tomorrow' timeframe, return tomorrow's tasks
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      return {
+        data: formattedTasks.filter(task => {
+          if (task.completed) return false;
+          
+          const taskDate = new Date(task.dueDate);
+          taskDate.setHours(0, 0, 0, 0);
+          
+          return taskDate.getTime() === tomorrow.getTime();
+        }),
+        error: null
+      };
+    } else if (timeframe === 'week') {
+      // For 'week' timeframe, return Next 7 Days tasks
+      const weekEnd = new Date(today);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      
+      return {
+        data: formattedTasks.filter(task => {
+          if (task.completed) return false;
+          
+          const taskDate = new Date(task.dueDate);
+          taskDate.setHours(0, 0, 0, 0);
+          
+          return taskDate >= today && taskDate <= weekEnd;
+        }),
+        error: null
+      };
+    } else if (timeframe === 'month') {
+      // For 'month' timeframe, return tasks for the next 30 days
+      const thirtyDaysLater = new Date(today);
+      thirtyDaysLater.setDate(today.getDate() + 30);
+      
+      return {
+        data: formattedTasks.filter(task => {
+          if (task.completed) return false;
+          
+          const taskDate = new Date(task.dueDate);
+          taskDate.setHours(0, 0, 0, 0);
+          
+          return taskDate >= today && taskDate <= thirtyDaysLater;
+        }),
+        error: null
+      };
+    } else if (timeframe === 'overdue') {
+      // For 'overdue' timeframe, return only overdue tasks
+      return {
+        data: formattedTasks.filter(task => {
+          if (task.completed) return false;
+          
+          const taskDate = new Date(task.dueDate);
+          taskDate.setHours(0, 0, 0, 0);
+          
+          return taskDate < today;
+        }),
+        error: null
+      };
+    }
+
+    // Return all tasks for any other timeframe
     return { data: formattedTasks, error: null };
   } catch (error) {
     console.error('Error in getTasks:', error);
