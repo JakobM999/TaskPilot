@@ -25,6 +25,9 @@ import {
   AccordionDetails,
   Tabs,
   Tab,
+  IconButton,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import {
   Brightness4 as DarkModeIcon,
@@ -48,6 +51,8 @@ import {
   IntegrationInstructions as IntegrationIcon,
   Settings as SettingsIcon,
   Engineering as EngineeringIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { testSupabaseConnection } from '../services/testSupabase';
 import { verifySupabaseSchema } from '../services/verifySchema';
@@ -74,7 +79,13 @@ function TabPanel(props) {
 }
 
 // Feature Upgrades component for the dedicated tab
-function FeatureUpgrades({ featureUpgrades, handleToggleFeature }) {
+function FeatureUpgrades({ featureUpgrades, setFeatureUpgrades, handleToggleFeature }) {
+  const [editMode, setEditMode] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
+  const [newCategoryTitle, setNewCategoryTitle] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [newTaskText, setNewTaskText] = useState('');
+
   // Calculate progress for feature upgrade categories
   const calculateProgress = (category) => {
     const tasks = featureUpgrades[category].tasks;
@@ -104,19 +115,164 @@ function FeatureUpgrades({ featureUpgrades, handleToggleFeature }) {
     };
   };
 
+  const handleAddCategory = () => {
+    if (newCategory && newCategoryTitle) {
+      const updatedUpgrades = {
+        ...featureUpgrades,
+        [newCategory]: {
+          title: newCategoryTitle,
+          tasks: []
+        }
+      };
+      localStorage.setItem('taskpilot_feature_upgrades', JSON.stringify(updatedUpgrades));
+      setFeatureUpgrades(updatedUpgrades);
+      setNewCategory('');
+      setNewCategoryTitle('');
+    }
+  };
+
+  const handleDeleteCategory = (category) => {
+    const updatedUpgrades = { ...featureUpgrades };
+    delete updatedUpgrades[category];
+    localStorage.setItem('taskpilot_feature_upgrades', JSON.stringify(updatedUpgrades));
+    setFeatureUpgrades(updatedUpgrades);
+  };
+
+  const handleAddTask = () => {
+    if (selectedCategory && newTaskText) {
+      const updatedUpgrades = {
+        ...featureUpgrades,
+        [selectedCategory]: {
+          ...featureUpgrades[selectedCategory],
+          tasks: [
+            ...featureUpgrades[selectedCategory].tasks,
+            {
+              id: Date.now().toString(),
+              text: newTaskText,
+              completed: false
+            }
+          ]
+        }
+      };
+      localStorage.setItem('taskpilot_feature_upgrades', JSON.stringify(updatedUpgrades));
+      setFeatureUpgrades(updatedUpgrades);
+      setNewTaskText('');
+    }
+  };
+
+  const handleDeleteTask = (category, taskId) => {
+    const updatedUpgrades = {
+      ...featureUpgrades,
+      [category]: {
+        ...featureUpgrades[category],
+        tasks: featureUpgrades[category].tasks.filter(task => task.id !== taskId)
+      }
+    };
+    localStorage.setItem('taskpilot_feature_upgrades', JSON.stringify(updatedUpgrades));
+    setFeatureUpgrades(updatedUpgrades);
+  };
+
   return (
     <>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-        <ConstructionIcon color="primary" />
-        <Typography variant="h5" component="h2">
-          Feature Upgrades To-Do List
-        </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ConstructionIcon color="primary" />
+          <Typography variant="h5" component="h2">
+            Feature Upgrades To-Do List
+          </Typography>
+        </Box>
+        <Button
+          variant="outlined"
+          onClick={() => setEditMode(!editMode)}
+          startIcon={editMode ? <SaveIcon /> : <EditIcon />}
+        >
+          {editMode ? 'Done Editing' : 'Edit List'}
+        </Button>
       </Box>
       
       <Typography variant="body1" paragraph>
         Track your progress implementing new features and improvements to TaskPilot.
         Overall progress: {calculateOverallProgress().count}/{calculateOverallProgress().total} ({calculateOverallProgress().percentage}% complete)
       </Typography>
+
+      {editMode && (
+        <Paper sx={{ p: 2, mb: 3 }} elevation={0} variant="outlined">
+          <Typography variant="h6" gutterBottom>Add New Category</Typography>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Category ID"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                size="small"
+                helperText="Use lowercase, no spaces (e.g., 'newFeatures')"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Category Title"
+                value={newCategoryTitle}
+                onChange={(e) => setNewCategoryTitle(e.target.value)}
+                size="small"
+                helperText="Display name for the category"
+              />
+            </Grid>
+            <Grid item xs={12} sm={2}>
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={handleAddCategory}
+                disabled={!newCategory || !newCategoryTitle}
+              >
+                Add
+              </Button>
+            </Grid>
+          </Grid>
+
+          <Divider sx={{ my: 2 }} />
+
+          <Typography variant="h6" gutterBottom>Add New Task</Typography>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={4}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Category</InputLabel>
+                <Select
+                  value={selectedCategory || ''}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  label="Category"
+                >
+                  {Object.keys(featureUpgrades).map((category) => (
+                    <MenuItem key={category} value={category}>
+                      {featureUpgrades[category].title}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Task Description"
+                value={newTaskText}
+                onChange={(e) => setNewTaskText(e.target.value)}
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} sm={2}>
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={handleAddTask}
+                disabled={!selectedCategory || !newTaskText}
+              >
+                Add
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
+      )}
       
       {Object.keys(featureUpgrades).map((category) => (
         <Accordion key={category} defaultExpanded={true}>
@@ -131,25 +287,59 @@ function FeatureUpgrades({ featureUpgrades, handleToggleFeature }) {
               
               <Typography variant="h6">{featureUpgrades[category].title}</Typography>
               
-              <Typography variant="body2" sx={{ ml: 'auto' }}>
+              <Typography variant="body2" sx={{ ml: 'auto', mr: 2 }}>
                 {calculateProgress(category).count}/{calculateProgress(category).total} completed
               </Typography>
+
+              {editMode && (
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteCategory(category);
+                  }}
+                  sx={{ mr: 1 }}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              )}
             </Box>
           </AccordionSummary>
           <AccordionDetails>
             <List dense>
               {featureUpgrades[category].tasks.map((task) => (
-                <ListItem key={task.id} disablePadding>
-                  <FormControlLabel
-                    control={
-                      <Checkbox 
-                        checked={task.completed}
-                        onChange={() => handleToggleFeature(category, task.id)}
-                        color="primary"
-                      />
-                    }
-                    label={task.text}
-                    sx={{ width: '100%', ml: 0.5 }}
+                <ListItem
+                  key={task.id}
+                  secondaryAction={
+                    editMode && (
+                      <IconButton
+                        edge="end"
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTask(category, task.id);
+                        }}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    )
+                  }
+                >
+                  <ListItemIcon>
+                    <Checkbox
+                      checked={task.completed}
+                      onChange={() => handleToggleFeature(category, task.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      edge="start"
+                      sx={{ ml: -1 }}
+                    />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={task.text}
+                    sx={{
+                      textDecoration: task.completed ? 'line-through' : 'none',
+                      color: task.completed ? 'text.secondary' : 'text.primary'
+                    }}
                   />
                 </ListItem>
               ))}
@@ -287,13 +477,17 @@ function Settings() {
 
   const handleToggleFeature = (category, taskId) => {
     setFeatureUpgrades(prevState => {
-      const newState = { ...prevState };
-      const categoryTasks = newState[category].tasks;
-      const taskIndex = categoryTasks.findIndex(t => t.id === taskId);
-      
-      if (taskIndex !== -1) {
-        categoryTasks[taskIndex].completed = !categoryTasks[taskIndex].completed;
-      }
+      const newState = {
+        ...prevState,
+        [category]: {
+          ...prevState[category],
+          tasks: prevState[category].tasks.map(task => 
+            task.id === taskId 
+              ? { ...task, completed: !task.completed }
+              : task
+          )
+        }
+      };
       
       // Save to localStorage after updating
       localStorage.setItem('taskpilot_feature_upgrades', JSON.stringify(newState));
@@ -747,6 +941,7 @@ function Settings() {
               <Paper sx={{ p: 3 }}>
                 <FeatureUpgrades 
                   featureUpgrades={featureUpgrades}
+                  setFeatureUpgrades={setFeatureUpgrades}
                   handleToggleFeature={handleToggleFeature}
                 />
 
