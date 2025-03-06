@@ -94,11 +94,33 @@ function Tasks({ user, onLogout }) {
 
   const handleCreateTask = async (newTask) => {
     try {
+      // Check if we have the user object available
+      if (!user) {
+        console.error('User not authenticated when attempting to create task');
+        return;
+      }
+
+      console.log('Creating new task with authenticated user:', user.email);
+      console.log('Task data:', newTask);
+      
       const { data, error } = await createTask(newTask);
+      
       if (error) {
         console.error('Error creating task:', error);
       } else {
-        setTasks([...tasks, data]);
+        console.log('Task created successfully:', data);
+        
+        // Refresh the tasks list to ensure database sync
+        const { data: refreshedTasks, error: refreshError } = await getTasks(currentTimeframe);
+        
+        if (refreshError) {
+          console.error('Error refreshing tasks after creation:', refreshError);
+          // Fall back to updating local state directly
+          setTasks([...tasks, data]);
+        } else {
+          console.log('Tasks refreshed successfully:', refreshedTasks);
+          setTasks(refreshedTasks || []);
+        }
       }
     } catch (err) {
       console.error('Error creating task:', err);
@@ -107,23 +129,34 @@ function Tasks({ user, onLogout }) {
 
   const handleUpdateTask = async (updatedTask) => {
     try {
+      setIsLoading(true);
+      console.log('Updating task:', updatedTask);
       const { data, error } = await updateTask(updatedTask);
+      
       if (error) {
         console.error('Error updating task:', error);
       } else {
+        console.log('Task updated successfully:', data);
+        // Update local state directly with the returned task data
         setTasks(tasks.map(task => task.id === data.id ? data : task));
       }
     } catch (err) {
       console.error('Error updating task:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDeleteTask = async (taskId) => {
     try {
+      console.log('Deleting task:', taskId);
       const { error } = await deleteTask(taskId);
+      
       if (error) {
         console.error('Error deleting task:', error);
       } else {
+        console.log('Task deleted successfully');
+        // Update local state directly
         setTasks(tasks.filter(task => task.id !== taskId));
       }
     } catch (err) {
@@ -133,10 +166,14 @@ function Tasks({ user, onLogout }) {
 
   const handleToggleComplete = async (taskId) => {
     try {
+      console.log('Toggling completion for task:', taskId);
       const { data, error } = await toggleTaskCompletion(taskId);
+      
       if (error) {
         console.error('Error toggling task completion:', error);
       } else {
+        console.log('Task completion toggled successfully:', data);
+        // Update local state directly with the returned task data
         setTasks(tasks.map(task => task.id === data.id ? data : task));
       }
     } catch (err) {
@@ -173,10 +210,13 @@ function Tasks({ user, onLogout }) {
 
   const handleRescheduleTask = async (taskId) => {
     try {
-      await rescheduleTask(taskId);
-      // Refresh tasks after rescheduling
-      const { data } = await getTasks(currentTimeframe);
-      setTasks(data);
+      const { data, error } = await rescheduleTask(taskId);
+      if (error) {
+        console.error('Error rescheduling task:', error);
+      } else {
+        // Update local state directly with the returned task data
+        setTasks(tasks.map(task => task.id === data.id ? data : task));
+      }
     } catch (err) {
       console.error('Error rescheduling task:', err);
     }

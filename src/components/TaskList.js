@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -25,6 +25,7 @@ import {
   Tooltip,
   InputAdornment,
   Fab,
+  Autocomplete,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -36,6 +37,8 @@ import WarningIcon from '@mui/icons-material/Warning';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import CategoryIcon from '@mui/icons-material/Category';
+import LabelIcon from '@mui/icons-material/Label';
+import { getUserTags, createTag } from '../services';
 
 function TaskList({
   tasks = [], // Provide default empty array
@@ -57,10 +60,33 @@ function TaskList({
     dueDate: new Date().toISOString().split('T')[0], // Default to today
     priority: 'medium',
     category: 'work', // Default to work
+    tags: [], // Add tags array
+    listItems: [] // Add listItems array
   });
   const [timeframe, setTimeframe] = useState(currentTimeframe);
   const [categoryFilter, setCategoryFilter] = useState('work'); // Default to work
-  const [taskSummary, setTaskSummary] = useState(null);
+  const [taskSummary] = useState(null);
+  const [tagFilter, setTagFilter] = useState(null);
+  const [tags, setTags] = useState([]);
+  const [newTagName, setNewTagName] = useState('');
+
+  // Fetch tags when component mounts
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const { data, error } = await getUserTags();
+        if (error) {
+          console.error('Error fetching tags:', error);
+        } else {
+          setTags(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch tags:', error);
+      }
+    };
+
+    fetchTags();
+  }, []);
 
   const timeframeOptions = [
     { value: 'today', label: 'Today' },
@@ -92,6 +118,8 @@ function TaskList({
       dueDate: new Date().toISOString().split('T')[0], // Default to today
       priority: 'medium',
       category: 'work', // Default to work
+      tags: [],
+      listItems: []
     });
     setOpenDialog(true);
   };
@@ -104,15 +132,50 @@ function TaskList({
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
+    setNewTagName('');
   };
 
   const handleSaveTask = () => {
+    // First set the date to local midnight in Denmark
+    const taskDate = new Date(currentTask.dueDate);
+    taskDate.setHours(0, 0, 0, 0);
+    
+    console.log('Saving task with date:', {
+      original: currentTask.dueDate,
+      localMidnight: taskDate.toISOString()
+    });
+
+    const taskToSave = {
+      id: currentTask.id, // Make sure to include the ID when editing
+      title: currentTask.title.trim(),
+      description: currentTask.description?.trim() || '',
+      dueDate: taskDate.toISOString(),
+      priority: currentTask.priority || 'medium',
+      category: currentTask.category || 'work',
+      completed: currentTask.completed || false,
+      escalated: currentTask.escalated || false,
+      pinned: currentTask.pinned || false,
+      hasListItems: Boolean(currentTask.listItems?.length),
+      tags: Array.isArray(currentTask.tags) ? currentTask.tags : [],
+      listItems: Array.isArray(currentTask.listItems) ? currentTask.listItems : []
+    };
+    
     if (isEditing) {
-      onUpdateTask(currentTask);
+      onUpdateTask(taskToSave);
     } else {
-      onCreateTask(currentTask);
+      onCreateTask(taskToSave);
     }
+
     setOpenDialog(false);
+    setCurrentTask({
+      title: '',
+      description: '',
+      dueDate: new Date().toISOString().split('T')[0],
+      priority: 'medium',
+      category: 'work',
+      tags: [],
+      listItems: []
+    });
   };
 
   const handleVoiceInput = () => {
@@ -145,62 +208,85 @@ function TaskList({
     onTimeframeChange(newTimeframe);
   };
 
-  const sortTasks = (tasks) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const handleTagChange = (event, newValue) => {
+    setCurrentTask({
+      ...currentTask,
+      tags: newValue
+    });
+  };
 
-    // Split tasks into categories
-    const overdueTasks = [];
-    const highPriorityTasks = [];
-    const mediumPriorityTasks = [];
-    const lowPriorityTasks = [];
-    const completedTasks = [];
-
-    tasks.forEach(task => {
-      if (task.completed) {
-        completedTasks.push(task);
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) return;
+    
+    try {
+      const { data: newTag, error } = await createTag(newTagName);
+      if (error) {
+        console.error('Error creating tag:', error);
         return;
       }
-
-      const taskDate = new Date(task.dueDate);
-      taskDate.setHours(0, 0, 0, 0);
       
-      if (taskDate < today) {
-        overdueTasks.push(task);
-      } else {
-        switch (task.priority) {
-          case 'high':
-            highPriorityTasks.push(task);
-            break;
-          case 'medium':
-            mediumPriorityTasks.push(task);
-            break;
-          case 'low':
-            lowPriorityTasks.push(task);
-            break;
-          default:
-            mediumPriorityTasks.push(task); // Default to medium if priority not set
+      // Add the new tag to the local state
+      setTags([...tags, newTag]);
+      
+      // Add the new tag to the current task
+      setCurrentTask({
+        ...currentTask,
+        tags: [...currentTask.tags, newTag]
+      });
+      
+      // Clear the input
+      setNewTagName('');
+    } catch (error) {
+      console.error('Failed to create tag:', error);
+    }
+  };
+
+  const sortTasks = (tasks) => {
+    // Priority score mapping
+    const priorityScore = {
+      'high': 3,
+      'medium': 2,
+      'low': 1
+    };
+
+    // Get current timeframe to determine sort logic
+    const isLongTermView = ['week', 'month', 'upcoming'].includes(timeframe);
+
+    return [...tasks].sort((a, b) => {
+      // If in week/month/upcoming view, sort by date first
+      if (isLongTermView) {
+        const dateA = new Date(a.dueDate);
+        const dateB = new Date(b.dueDate);
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateA.getTime() - dateB.getTime();
         }
       }
+
+      // Then sort by escalated status
+      if (a.escalated !== b.escalated) {
+        return a.escalated ? -1 : 1;
+      }
+
+      // Then sort by priority
+      const priorityDiff = priorityScore[b.priority] - priorityScore[a.priority];
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+
+      // Finally sort by due date for non-long-term views
+      if (!isLongTermView) {
+        return new Date(a.dueDate) - new Date(b.dueDate);
+      }
+
+      return 0;
     });
+  };
 
-    // Sort each category by due date
-    const sortByDueDate = (a, b) => new Date(a.dueDate) - new Date(b.dueDate);
-    
-    overdueTasks.sort(sortByDueDate);
-    highPriorityTasks.sort(sortByDueDate);
-    mediumPriorityTasks.sort(sortByDueDate);
-    lowPriorityTasks.sort(sortByDueDate);
-    completedTasks.sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate)); // Most recent first
-
-    // Combine all tasks in the desired order
-    return [
-      ...overdueTasks,
-      ...highPriorityTasks,
-      ...mediumPriorityTasks,
-      ...lowPriorityTasks,
-      ...completedTasks
-    ];
+  const filterTasksByTag = (tasks, tagId) => {
+    if (!tagId) return tasks;
+    return tasks.filter(task => 
+      task.tags && task.tags.some(tag => tag.id === tagId)
+    );
   };
 
   if (isLoading) {
@@ -265,6 +351,36 @@ function TaskList({
               <MenuItem value="private">Private</MenuItem>
             </Select>
           </FormControl>
+          <FormControl size="small">
+            <Select
+              value={tagFilter || ''}
+              onChange={(e) => setTagFilter(e.target.value || null)}
+              displayEmpty
+              startAdornment={
+                <InputAdornment position="start">
+                  <LabelIcon fontSize="small" />
+                </InputAdornment>
+              }
+              sx={{ minWidth: 120 }}
+            >
+              <MenuItem value="">All Tags</MenuItem>
+              {tags.map(tag => (
+                <MenuItem key={tag.id} value={tag.id}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        backgroundColor: tag.color || '#1976D2'
+                      }}
+                    />
+                    {tag.name}
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Button 
             variant="contained" 
             startIcon={<AddIcon />}
@@ -284,9 +400,12 @@ function TaskList({
         </Box>
       ) : (
         <List sx={{ width: '100%' }}>
-          {sortTasks(tasks.filter(task => 
-            categoryFilter === 'all' || task.category === categoryFilter
-          )).map((task) => {
+          {sortTasks(
+            filterTasksByTag(
+              tasks.filter(task => categoryFilter === 'all' || task.category === categoryFilter),
+              tagFilter
+            )
+          ).map((task) => {
             const taskDate = new Date(task.dueDate);
             taskDate.setHours(0, 0, 0, 0);
             const today = new Date();
@@ -371,7 +490,7 @@ function TaskList({
                   </ListItemIcon>
                   <ListItemText
                     primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                         <Typography
                           variant="subtitle1"
                           sx={{
@@ -416,6 +535,28 @@ function TaskList({
                         >
                           {task.description}
                         </Typography>
+                        
+                        {/* Tags row */}
+                        {task.tags && task.tags.length > 0 && (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.5 }}>
+                            {task.tags.map(tag => (
+                              <Chip
+                                key={tag.id}
+                                label={tag.name}
+                                size="small"
+                                variant="outlined"
+                                sx={{ 
+                                  height: 20,
+                                  '& .MuiChip-label': { px: 1, py: 0 },
+                                  backgroundColor: `${tag.color}20`,
+                                  borderColor: tag.color,
+                                  color: 'text.secondary'
+                                }}
+                              />
+                            ))}
+                          </Box>
+                        )}
+                        
                         <Typography 
                           variant="caption" 
                           color={isOverdue ? 'error.main' : 'text.secondary'}
@@ -517,6 +658,83 @@ function TaskList({
                   <MenuItem value="private">Private</MenuItem>
                 </Select>
               </FormControl>
+            </Grid>
+            
+            {/* Tags section */}
+            <Grid item xs={12}>
+              <Divider textAlign="left" sx={{ mt: 1, mb: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Tags
+                </Typography>
+              </Divider>
+              
+              <Autocomplete
+                multiple
+                id="tags-select"
+                options={tags}
+                value={currentTask.tags || []}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                getOptionLabel={(option) => option.name}
+                onChange={handleTagChange}
+                renderOption={(props, option) => (
+                  <li {...props}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box
+                        sx={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: '50%',
+                          backgroundColor: option.color || '#1976D2'
+                        }}
+                      />
+                      {option.name}
+                    </Box>
+                  </li>
+                )}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      key={option.id}
+                      label={option.name}
+                      {...getTagProps({ index })}
+                      size="small"
+                      sx={{
+                        backgroundColor: `${option.color}30`,
+                        borderColor: option.color,
+                        '& .MuiChip-deleteIcon': {
+                          color: `${option.color}99`
+                        }
+                      }}
+                    />
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    variant="outlined"
+                    label="Select Tags"
+                    placeholder="Tags"
+                  />
+                )}
+              />
+              
+              <Box sx={{ display: 'flex', mt: 1, gap: 1 }}>
+                <TextField
+                  size="small"
+                  label="Create New Tag"
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  fullWidth
+                />
+                <Button
+                  variant="outlined"
+                  onClick={handleCreateTag}
+                  disabled={!newTagName.trim()}
+                  startIcon={<AddIcon />}
+                >
+                  Add
+                </Button>
+              </Box>
             </Grid>
           </Grid>
         </DialogContent>

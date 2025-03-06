@@ -24,7 +24,14 @@ export const {
   updateTask,
   deleteTask,
   toggleTaskCompletion,
-  rescheduleTask
+  rescheduleTask,
+  getUserTags,
+  createTag,
+  toggleListItemCompletion,
+  toggleTaskPin,
+  addListItem,
+  deleteListItem,
+  updateListItem
 } = USE_SUPABASE 
   ? require('./taskService.supabase')
   : require('./taskService');
