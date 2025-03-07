@@ -30,7 +30,7 @@ import Calendar from './Calendar';
 import AIAssistant from './AIAssistant';
 import Settings from './Settings';
 import { signOut } from '../services/index';
-import { getTasks, createTask, updateTask, deleteTask, toggleTaskCompletion, rescheduleTask } from '../services/index';
+import { getTasks, createTask, updateTask, deleteTask, toggleTaskCompletion, toggleTaskPin, rescheduleTask } from '../services/index';
 import { analyzeTask, prioritizeTasks, getTaskManagementAdvice } from '../services/aiService';
 
 const drawerWidth = 240;
@@ -42,7 +42,7 @@ function Tasks({ user, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currentTimeframe, setCurrentTimeframe] = useState('today');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('tasks'); // Changed from 'dashboard' to 'tasks'
   const theme = useTheme();
 
   // Fetch tasks and initial AI advice
@@ -184,6 +184,22 @@ function Tasks({ user, onLogout }) {
     }
   };
 
+  const handleTogglePin = async (taskId) => {
+    try {
+      const { data, error } = await toggleTaskPin(taskId);
+      if (error) {
+        console.error('Error toggling task pin:', error);
+      } else {
+        // Update local state with the pinned status
+        setTasks(tasks.map(task => 
+          task.id === taskId ? { ...task, pinned: data.pinned } : task
+        ));
+      }
+    } catch (err) {
+      console.error('Error toggling task pin:', err);
+    }
+  };
+
   const handleSidebarCollapse = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
@@ -209,15 +225,15 @@ function Tasks({ user, onLogout }) {
       <List>
         <ListItem 
           button 
-          onClick={() => setActiveTab('dashboard')}
-          selected={activeTab === 'dashboard'}
+          onClick={() => setActiveTab('tasks')}
+          selected={activeTab === 'tasks'}
         >
           <ListItemIcon>
-            <Tooltip title="Dashboard" placement="right">
+            <Tooltip title="Tasks" placement="right">
               <DashboardIcon />
             </Tooltip>
           </ListItemIcon>
-          {!sidebarCollapsed && <ListItemText primary="Dashboard" />}
+          {!sidebarCollapsed && <ListItemText primary="Tasks" />}
         </ListItem>
         <ListItem 
           button 
@@ -269,6 +285,7 @@ function Tasks({ user, onLogout }) {
                   <Calendar 
                     tasks={tasks}
                     onToggleComplete={handleToggleComplete}
+                    onTogglePin={handleTogglePin}
                     isLoading={isLoading}
                   />
                 </Paper>
@@ -310,6 +327,7 @@ function Tasks({ user, onLogout }) {
                     onAnalyzeTask={handleAnalyzeTask}
                     onRescheduleTask={handleRescheduleTask}
                     onTimeframeChange={setCurrentTimeframe}
+                    onTogglePin={handleTogglePin}
                     currentTimeframe={currentTimeframe}
                     isLoading={isLoading}
                   />

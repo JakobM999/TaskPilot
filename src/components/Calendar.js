@@ -26,9 +26,10 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingIcon from '@mui/icons-material/Pending';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import GroupsIcon from '@mui/icons-material/Groups';
+import PushPinIcon from '@mui/icons-material/PushPin';
 import { getTodayEvents } from '../services/calendarService.supabase';
 
-function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
+function Calendar({ tasks = [], onToggleComplete, onTogglePin, isLoading = false }) {
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
 
@@ -47,25 +48,32 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
     fetchEvents();
   }, []);
 
-  // Group tasks by status and only show today's and overdue tasks
+  // Group tasks by status and show pinned tasks in relevant sections
   const groupedTasks = {
     completed: tasks.filter(t => t.completed),
     overdue: tasks.filter(t => {
+      if (t.completed) return false;
+      
       const taskDate = new Date(t.dueDate);
       taskDate.setHours(0, 0, 0, 0);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      return !t.completed && taskDate < today;
+      
+      // Show if task is pinned or overdue
+      return taskDate < today || t.pinned;
     }),
     today: tasks.filter(t => {
+      if (t.completed) return false;
+
       const taskDate = new Date(t.dueDate);
       taskDate.setHours(0, 0, 0, 0);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      // Only show uncompleted tasks for today
-      return !t.completed && taskDate.getTime() === today.getTime();
+      
+      // Show uncompleted tasks for today and all pinned tasks
+      return t.pinned || taskDate.getTime() === today.getTime();
     }),
-    // Add awaiting tasks (all uncompleted tasks)
+    // Add awaiting tasks (all uncompleted tasks including pinned ones)
     awaiting: tasks.filter(t => !t.completed)
   };
 
@@ -99,6 +107,15 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
     );
   }
 
+  const sortByPin = (tasks) => {
+    return [...tasks].sort((a, b) => {
+      if (a.pinned !== b.pinned) {
+        return a.pinned ? -1 : 1;
+      }
+      return 0;
+    });
+  };
+
   const TaskGroup = ({ title, tasks, icon, color }) => (
     <Box sx={{ mb: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -109,7 +126,7 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
       </Box>
       {tasks.length > 0 ? (
         <List dense sx={{ bgcolor: 'background.paper' }}>
-          {tasks.map((task) => (
+          {sortByPin(tasks).map((task) => (
             <ListItem
               key={task.id}
               sx={{
@@ -119,6 +136,29 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
                 borderRadius: 1,
                 '&:hover': { bgcolor: 'action.hover' }
               }}
+              secondaryAction={
+                <Box>
+                  <Tooltip title={task.pinned ? "Unpin task" : "Pin task"}>
+                    <IconButton 
+                      size="small" 
+                      onClick={() => onTogglePin(task.id)}
+                      color={task.pinned ? "primary" : "default"}
+                    >
+                      <PushPinIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <IconButton 
+                    edge="end" 
+                    size="small"
+                    onClick={() => onToggleComplete(task.id)}
+                  >
+                    <CheckCircleIcon 
+                      color={task.completed ? 'success' : 'action'} 
+                      fontSize="small"
+                    />
+                  </IconButton>
+                </Box>
+              }
             >
               <ListItemText
                 primary={
@@ -144,16 +184,6 @@ function Calendar({ tasks = [], onToggleComplete, isLoading = false }) {
                   </Typography>
                 }
               />
-              <IconButton 
-                edge="end" 
-                size="small"
-                onClick={() => onToggleComplete(task.id)}
-              >
-                <CheckCircleIcon 
-                  color={task.completed ? 'success' : 'action'} 
-                  fontSize="small"
-                />
-              </IconButton>
             </ListItem>
           ))}
         </List>

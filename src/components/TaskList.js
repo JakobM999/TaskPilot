@@ -38,6 +38,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import CategoryIcon from '@mui/icons-material/Category';
 import LabelIcon from '@mui/icons-material/Label';
+import PushPinIcon from '@mui/icons-material/PushPin';
 import { getUserTags, createTag } from '../services';
 
 function TaskList({
@@ -49,6 +50,7 @@ function TaskList({
   onAnalyzeTask,
   onRescheduleTask,
   onTimeframeChange,
+  onTogglePin,
   currentTimeframe,
   isLoading
 }) {
@@ -249,11 +251,14 @@ function TaskList({
       'low': 1
     };
 
-    // Get current timeframe to determine sort logic
-    const isLongTermView = ['week', 'month', 'upcoming'].includes(timeframe);
-
     return [...tasks].sort((a, b) => {
+      // First sort by pin status
+      if (a.pinned !== b.pinned) {
+        return a.pinned ? -1 : 1;
+      }
+
       // If in week/month/upcoming view, sort by date first
+      const isLongTermView = ['week', 'month', 'upcoming'].includes(timeframe);
       if (isLongTermView) {
         const dateA = new Date(a.dueDate);
         const dateB = new Date(b.dueDate);
@@ -402,7 +407,51 @@ function TaskList({
         <List sx={{ width: '100%' }}>
           {sortTasks(
             filterTasksByTag(
-              tasks.filter(task => categoryFilter === 'all' || task.category === categoryFilter),
+              tasks.filter(task => {
+                // First check if task is completed
+                if (task.completed) {
+                  return false;
+                }
+
+                // Always show pinned tasks
+                if (task.pinned) {
+                  return categoryFilter === 'all' || task.category === categoryFilter;
+                }
+                
+                // Filter by category
+                if (categoryFilter !== 'all' && task.category !== categoryFilter) {
+                  return false;
+                }
+
+                // Check date filters
+                const taskDate = new Date(task.dueDate);
+                taskDate.setHours(0, 0, 0, 0);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                switch(timeframe) {
+                  case 'today':
+                    return taskDate.getTime() === today.getTime();
+                  case 'tomorrow':
+                    const tomorrow = new Date(today);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    return taskDate.getTime() === tomorrow.getTime();
+                  case 'week':
+                    const weekEnd = new Date(today);
+                    weekEnd.setDate(weekEnd.getDate() + 7);
+                    return taskDate >= today && taskDate <= weekEnd;
+                  case 'month':
+                    const monthEnd = new Date(today);
+                    monthEnd.setDate(monthEnd.getDate() + 30);
+                    return taskDate >= today && taskDate <= monthEnd;
+                  case 'overdue':
+                    return taskDate < today;
+                  case 'upcoming':
+                    return taskDate >= today;
+                  default:
+                    return true;
+                }
+              }),
               tagFilter
             )
           ).map((task) => {
@@ -428,6 +477,15 @@ function TaskList({
                   }}
                   secondaryAction={
                     <Box>
+                      <Tooltip title={task.pinned ? "Unpin task" : "Pin task"}>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => onTogglePin(task.id)}
+                          color={task.pinned ? "primary" : "default"}
+                        >
+                          <PushPinIcon />
+                        </IconButton>
+                      </Tooltip>
                       {task.escalated && (
                         <Tooltip title="Task priority escalated">
                           <IconButton size="small" color="error">

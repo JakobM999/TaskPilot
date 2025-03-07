@@ -30,7 +30,7 @@ import Calendar from './Calendar';
 import AIAssistant from './AIAssistant';
 import Settings from './Settings';
 import { signOut } from '../services/index';
-import { getTasks, createTask, updateTask, deleteTask, toggleTaskCompletion, rescheduleTask } from '../services/index';
+import { getTasks, createTask, updateTask, deleteTask, toggleTaskCompletion, toggleTaskPin, rescheduleTask } from '../services/index';
 import { analyzeTask, prioritizeTasks, getTaskManagementAdvice } from '../services/aiService';
 
 const drawerWidth = 240;
@@ -222,6 +222,22 @@ function Tasks({ user, onLogout }) {
     }
   };
 
+  const handleTogglePin = async (taskId) => {
+    try {
+      const { data, error } = await toggleTaskPin(taskId);
+      if (error) {
+        console.error('Error toggling task pin:', error);
+      } else {
+        // Update local state with the pinned status
+        setTasks(tasks.map(task => 
+          task.id === taskId ? { ...task, pinned: data.pinned } : task
+        ));
+      }
+    } catch (err) {
+      console.error('Error toggling task pin:', err);
+    }
+  };
+
   const handleSidebarCollapse = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
@@ -307,6 +323,7 @@ function Tasks({ user, onLogout }) {
                   <Calendar 
                     tasks={tasks}
                     onToggleComplete={handleToggleComplete}
+                    onTogglePin={handleTogglePin}
                     isLoading={isLoading}
                   />
                 </Paper>
@@ -348,6 +365,7 @@ function Tasks({ user, onLogout }) {
                     onAnalyzeTask={handleAnalyzeTask}
                     onRescheduleTask={handleRescheduleTask}
                     onTimeframeChange={setCurrentTimeframe}
+                    onTogglePin={handleTogglePin}
                     currentTimeframe={currentTimeframe}
                     isLoading={isLoading}
                   />
