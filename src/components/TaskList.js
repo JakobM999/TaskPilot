@@ -261,13 +261,23 @@ function TaskList({
         return a.pinned ? -1 : 1;
       }
 
+      // Then sort by overdue status
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const aDate = new Date(a.dueDate);
+      const bDate = new Date(b.dueDate);
+      const aOverdue = aDate < today && !a.completed;
+      const bOverdue = bDate < today && !b.completed;
+      
+      if (aOverdue !== bOverdue) {
+        return aOverdue ? -1 : 1;
+      }
+
       // If in week/month/upcoming view, sort by date first
       const isLongTermView = ['week', 'month', 'upcoming'].includes(timeframe);
       if (isLongTermView) {
-        const dateA = new Date(a.dueDate);
-        const dateB = new Date(b.dueDate);
-        if (dateA.getTime() !== dateB.getTime()) {
-          return dateA.getTime() - dateB.getTime();
+        if (aDate.getTime() !== bDate.getTime()) {
+          return aDate.getTime() - bDate.getTime();
         }
       }
 
@@ -284,7 +294,7 @@ function TaskList({
 
       // Finally sort by due date for non-long-term views
       if (!isLongTermView) {
-        return new Date(a.dueDate) - new Date(b.dueDate);
+        return aDate - bDate;
       }
 
       return 0;
@@ -423,21 +433,24 @@ function TaskList({
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
 
+                // Calculate if task is overdue
+                const isOverdue = taskDate < today && !task.completed;
+
                 switch(timeframe) {
                   case 'today':
-                    return taskDate.getTime() === today.getTime();
+                    return isOverdue || taskDate.getTime() === today.getTime();
                   case 'tomorrow':
                     const tomorrow = new Date(today);
                     tomorrow.setDate(tomorrow.getDate() + 1);
-                    return taskDate.getTime() === tomorrow.getTime();
+                    return isOverdue || taskDate.getTime() === tomorrow.getTime();
                   case 'week':
                     const weekEnd = new Date(today);
                     weekEnd.setDate(weekEnd.getDate() + 7);
-                    return taskDate >= today && taskDate <= weekEnd;
+                    return isOverdue || (taskDate >= today && taskDate <= weekEnd);
                   case 'month':
                     const monthEnd = new Date(today);
                     monthEnd.setDate(monthEnd.getDate() + 30);
-                    return taskDate >= today && taskDate <= monthEnd;
+                    return isOverdue || (taskDate >= today && taskDate <= monthEnd);
                   case 'overdue':
                     return taskDate < today;
                   case 'upcoming':
