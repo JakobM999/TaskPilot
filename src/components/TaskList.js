@@ -468,10 +468,11 @@ function TaskList({
                       isOverdue ? 'error.main' : 
                       task.pinned ? 'primary.main' :
                       'transparent',
-                    '&:hover': { bgcolor: 'action.hover' }
+                    '&:hover': { bgcolor: 'action.hover' },
+                    pr: '160px', // Add right padding to prevent text overlap with buttons
                   }}
                   secondaryAction={
-                    <Box>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
                       <Tooltip title={task.pinned ? "Unpin task" : "Pin task"}>
                         <IconButton 
                           size="small" 
@@ -505,8 +506,7 @@ function TaskList({
                       )}
                       <Tooltip title="AI Analysis">
                         <IconButton 
-                          edge="end" 
-                          aria-label="ai analysis"
+                          size="small"
                           onClick={() => onAnalyzeTask(task)}
                         >
                           <SmartToyIcon />
@@ -514,8 +514,7 @@ function TaskList({
                       </Tooltip>
                       <Tooltip title="Edit">
                         <IconButton 
-                          edge="end" 
-                          aria-label="edit"
+                          size="small"
                           onClick={() => handleOpenEditDialog(task)}
                         >
                           <EditIcon />
@@ -523,8 +522,7 @@ function TaskList({
                       </Tooltip>
                       <Tooltip title="Delete">
                         <IconButton 
-                          edge="end" 
-                          aria-label="delete"
+                          size="small"
                           onClick={() => onDeleteTask(task.id)}
                         >
                           <DeleteIcon />
@@ -591,6 +589,9 @@ function TaskList({
                             display: 'block',
                             textDecoration: task.completed ? 'line-through' : 'none',
                             mb: 0.5,
+                            wordBreak: 'break-word', // Add word breaking
+                            overflowWrap: 'break-word', // Ensure long words break
+                            maxWidth: 'calc(100% - 48px)' // Leave space for icons
                           }}
                         >
                           {task.description}
