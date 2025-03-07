@@ -468,13 +468,15 @@ function TaskList({
                 <ListItem
                   alignItems="flex-start"
                   sx={{
-                    backgroundColor: task.completed ? 'rgba(0, 0, 0, 0.04)' : 
-                                 isOverdue ? 'error.100' :
-                                 task.escalated ? 'error.50' : 'transparent',
+                    backgroundColor: task.completed ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
                     borderRadius: 1,
                     mb: 1,
-                    border: (isOverdue || task.escalated) ? '1px solid' : 'none',
-                    borderColor: 'error.light',
+                    border: 1,
+                    borderColor: 
+                      isOverdue ? 'error.main' : 
+                      task.pinned ? 'primary.main' :
+                      'transparent',
+                    '&:hover': { bgcolor: 'action.hover' }
                   }}
                   secondaryAction={
                     <Box>
