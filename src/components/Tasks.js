@@ -30,7 +30,7 @@ import Calendar from './Calendar';
 import AIAssistant from './AIAssistant';
 import Settings from './Settings';
 import { signOut } from '../services/index';
-import { getTasks, createTask, updateTask, deleteTask, toggleTaskCompletion, toggleTaskPin, rescheduleTask } from '../services/index';
+import { getTasks, createTask, updateTask, deleteTask, toggleTaskCompletion, toggleTaskPin, toggleTaskEscalation, rescheduleTask } from '../services/index';
 import { analyzeTask, prioritizeTasks, getTaskManagementAdvice } from '../services/aiService';
 
 const drawerWidth = 240;
@@ -238,6 +238,22 @@ function Tasks({ user, onLogout }) {
     }
   };
 
+  const handleToggleEscalation = async (taskId) => {
+    try {
+      const { data, error } = await toggleTaskEscalation(taskId);
+      if (error) {
+        console.error('Error toggling task escalation:', error);
+      } else {
+        // Update local state with the escalated status
+        setTasks(tasks.map(task => 
+          task.id === taskId ? { ...task, escalated: data.escalated } : task
+        ));
+      }
+    } catch (err) {
+      console.error('Error toggling task escalation:', err);
+    }
+  };
+
   const handleSidebarCollapse = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
@@ -366,6 +382,7 @@ function Tasks({ user, onLogout }) {
                     onRescheduleTask={handleRescheduleTask}
                     onTimeframeChange={setCurrentTimeframe}
                     onTogglePin={handleTogglePin}
+                    onToggleEscalation={handleToggleEscalation}
                     currentTimeframe={currentTimeframe}
                     isLoading={isLoading}
                   />

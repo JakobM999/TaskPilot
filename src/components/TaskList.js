@@ -51,6 +51,7 @@ function TaskList({
   onRescheduleTask,
   onTimeframeChange,
   onTogglePin,
+  onToggleEscalation,
   currentTimeframe,
   isLoading
 }) {
@@ -487,8 +488,12 @@ function TaskList({
                         </IconButton>
                       </Tooltip>
                       {task.escalated && (
-                        <Tooltip title="Task priority escalated">
-                          <IconButton size="small" color="error">
+                        <Tooltip title="Remove escalation">
+                          <IconButton 
+                            size="small" 
+                            color="error"
+                            onClick={() => onToggleEscalation(task.id)}
+                          >
                             <TrendingUpIcon />
                           </IconButton>
                         </Tooltip>

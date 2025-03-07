@@ -566,6 +566,55 @@ export const toggleTaskPin = async (taskId) => {
   }
 };
 
+// Toggle task escalation status
+export const toggleTaskEscalation = async (taskId) => {
+  try {
+    // Get the current user's ID 
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { data: null, error: new Error('User not authenticated') };
+    }
+
+    // First get the current state of the task
+    const { data: taskData, error: fetchError } = await supabase
+      .from('tasks')
+      .select('escalated')
+      .eq('id', taskId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching task escalation status:', fetchError);
+      return { data: null, error: fetchError };
+    }
+
+    // Toggle the escalation status
+    const newEscalatedStatus = !taskData.escalated;
+
+    // Update the task with the toggled escalation status
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ 
+        escalated: newEscalatedStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', taskId)
+      .eq('user_id', user.id)
+      .select();
+
+    if (error) {
+      console.error('Error toggling task escalation status:', error);
+      return { data: null, error };
+    }
+
+    return { data: { id: taskId, escalated: newEscalatedStatus }, error: null };
+  } catch (error) {
+    console.error('Error in toggleTaskEscalation:', error);
+    return { data: null, error };
+  }
+};
+
 // Update a list item's completion status
 export const toggleListItemCompletion = async (taskId, itemId) => {
   try {

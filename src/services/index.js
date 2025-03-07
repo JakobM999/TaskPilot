@@ -24,6 +24,7 @@ export const {
   updateTask,
   deleteTask,
   toggleTaskCompletion,
+  toggleTaskEscalation,
   rescheduleTask,
   getUserTags,
   createTag,
