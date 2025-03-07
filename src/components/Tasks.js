@@ -174,7 +174,9 @@ function Tasks({ user, onLogout }) {
       } else {
         console.log('Task completion toggled successfully:', data);
         // Update local state directly with the returned task data
-        setTasks(tasks.map(task => task.id === data.id ? data : task));
+        setTasks(prevTasks => prevTasks.map(task => 
+          task.id === data.id ? data : task
+        ));
       }
     } catch (err) {
       console.error('Error toggling task completion:', err);

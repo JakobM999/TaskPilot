@@ -697,7 +697,13 @@ export const toggleTaskCompletion = async (taskId) => {
     // First get the current task
     const { data: task, error: fetchError } = await supabase
       .from('tasks')
-      .select('*')
+      .select(`
+        *,
+        tags:task_tags(
+          id,
+          tag:tags(*)
+        )
+      `)
       .eq('id', taskId)
       .single();
 
@@ -711,25 +717,28 @@ export const toggleTaskCompletion = async (taskId) => {
         completed_at: !task.completed ? new Date().toISOString() : null 
       })
       .eq('id', taskId)
-      .select()
+      .select(`
+        *,
+        tags:task_tags(
+          id,
+          tag:tags(*)
+        )
+      `)
       .single();
 
     if (updateError) throw updateError;
 
-    // Format task for frontend
-    const formattedTask = {
-      id: data.id,
-      title: data.title,
-      description: data.description,
-      dueDate: data.due_date,
-      priority: data.priority,
-      category: data.category || 'work',
-      completed: data.completed,
-      escalated: data.escalated,
-      tags: data.tags || []
-    };
+    // Return the updated task with the new completion status
+    const formattedTask = formatTasks([data])[0];
+    console.log('Task completion toggled:', { 
+      taskId, 
+      completed: formattedTask.completed 
+    });
 
-    return { data: formattedTask, error: null };
+    return { 
+      data: formattedTask,
+      error: null 
+    };
   } catch (error) {
     console.error('Error toggling task completion:', error);
     return { data: null, error };

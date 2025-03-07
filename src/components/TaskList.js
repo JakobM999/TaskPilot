@@ -251,7 +251,12 @@ function TaskList({
     };
 
     return [...tasks].sort((a, b) => {
-      // First sort by pin status
+      // First sort by completion status
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1;
+      }
+
+      // Then sort by pin status
       if (a.pinned !== b.pinned) {
         return a.pinned ? -1 : 1;
       }
@@ -407,16 +412,6 @@ function TaskList({
           {sortTasks(
             filterTasksByTag(
               tasks.filter(task => {
-                // First check if task is completed
-                if (task.completed) {
-                  return false;
-                }
-
-                // Always show pinned tasks
-                if (task.pinned) {
-                  return categoryFilter === 'all' || task.category === categoryFilter;
-                }
-                
                 // Filter by category
                 if (categoryFilter !== 'all' && task.category !== categoryFilter) {
                   return false;
@@ -458,7 +453,6 @@ function TaskList({
             taskDate.setHours(0, 0, 0, 0);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            // Only consider a task overdue if its due date is strictly before today
             const isOverdue = taskDate < today && !task.completed;
             
             return (
@@ -542,11 +536,14 @@ function TaskList({
                   <ListItemIcon>
                     <Checkbox
                       edge="start"
-                      checked={task.completed}
-                      onChange={() => onToggleComplete(task.id)}
+                      checked={task.completed || false}
+                      onChange={() => {
+                        console.log('Toggling completion for task:', task.id);
+                        onToggleComplete(task.id);
+                      }}
                       sx={{
                         '&.Mui-checked': {
-                          color: 'primary.main',
+                          color: 'success.main',
                         },
                       }}
                     />
