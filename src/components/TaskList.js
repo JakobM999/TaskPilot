@@ -107,10 +107,11 @@ function TaskList({
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setCurrentTask({
-      ...currentTask,
-      [name]: value,
-    });
+    console.log('Input change:', { name, value });
+    setCurrentTask(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleOpenNewTaskDialog = () => {
@@ -129,11 +130,17 @@ function TaskList({
 
   const handleOpenEditDialog = (task) => {
     setIsEditing(true);
-    // Format the date to YYYY-MM-DD for the date input
-    const taskDate = new Date(task.dueDate);
+    // Format task data for editing, maintaining all needed fields
     setCurrentTask({
-      ...task,
-      dueDate: taskDate.toISOString().split('T')[0],
+      id: task.id,
+      title: task.title || '',
+      description: task.description || '',
+      dueDate: task.dueDate.split('T')[0], // Format the date for the date input
+      priority: task.priority || 'medium',
+      category: task.category || 'work',
+      completed: task.completed || false,
+      escalated: task.escalated || false,
+      pinned: task.pinned || false,
       tags: task.tags || [],
       listItems: task.listItems || []
     });
@@ -146,26 +153,27 @@ function TaskList({
   };
 
   const handleSaveTask = () => {
-    const taskToSave = {
-      ...(isEditing ? { id: currentTask.id } : {}),
-      title: currentTask.title.trim(),
-      description: currentTask.description?.trim() || '',
-      due_date: currentTask.dueDate, // Pass the date directly from the date input
-      priority: currentTask.priority || 'medium',
-      category: currentTask.category || 'work',
+    const task = {
+      id: currentTask.id, // Preserve ID for updates
+      title: currentTask.title,
+      description: currentTask.description,
+      due_date: currentTask.dueDate,
+      dueDate: currentTask.dueDate,
+      priority: currentTask.priority,
+      category: currentTask.category,
       completed: currentTask.completed || false,
       escalated: currentTask.escalated || false,
       pinned: currentTask.pinned || false,
-      tags: Array.isArray(currentTask.tags) ? currentTask.tags : [],
-      listItems: Array.isArray(currentTask.listItems) ? currentTask.listItems : []
+      tags: currentTask.tags || [],
+      listItems: currentTask.listItems || []
     };
     
-    console.log('Saving task:', taskToSave);
+    console.log('Saving task:', task);
 
     if (isEditing) {
-      onUpdateTask(taskToSave);
+      onUpdateTask(task);
     } else {
-      onCreateTask(taskToSave);
+      onCreateTask(task);
     }
 
     handleCloseDialog();

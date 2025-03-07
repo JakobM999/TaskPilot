@@ -66,7 +66,8 @@ export const getTasks = async (timeframe = 'today') => {
         ),
         list_items(*)
       `)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .eq('completed', false);  // Only get uncompleted tasks
 
     // Apply timeframe filters
     switch (timeframe) {
@@ -89,8 +90,7 @@ export const getTasks = async (timeframe = 'today') => {
         const weekEndStr = weekEndUTC.toISOString().split('T')[0];
         query = query
           .gte('due_date::date', todayStr)
-          .lte('due_date::date', weekEndStr)
-          .order('due_date', { ascending: true }); // Sort by date first
+          .lte('due_date::date', weekEndStr);
         break;
       
       case 'month':
@@ -100,14 +100,11 @@ export const getTasks = async (timeframe = 'today') => {
         const monthEndStr = monthEndUTC.toISOString().split('T')[0];
         query = query
           .gte('due_date::date', todayStr)
-          .lte('due_date::date', monthEndStr)
-          .order('due_date', { ascending: true }); // Sort by date first
+          .lte('due_date::date', monthEndStr);
         break;
       
       case 'upcoming':
-        query = query
-          .gte('due_date::date', todayStr)
-          .order('due_date', { ascending: true }); // Sort by date first
+        query = query.gte('due_date::date', todayStr);
         break;
       
       case 'overdue':
@@ -130,17 +127,19 @@ export const getTasks = async (timeframe = 'today') => {
       throw timeframeError;
     }
 
-    // Combine overdue tasks with timeframe tasks, ensuring no duplicates
+    // Always include overdue tasks at the start for today, tomorrow, week and month views
     const allTaskIds = new Set();
     const combinedTasks = [];
 
-    // Add overdue tasks first
-    overdueTasks?.forEach(task => {
-      if (!allTaskIds.has(task.id)) {
-        allTaskIds.add(task.id);
-        combinedTasks.push(task);
-      }
-    });
+    // Add overdue tasks first for today, tomorrow, week and month views
+    if (['today', 'tomorrow', 'week', 'month'].includes(timeframe)) {
+      overdueTasks?.forEach(task => {
+        if (!allTaskIds.has(task.id)) {
+          allTaskIds.add(task.id);
+          combinedTasks.push(task);
+        }
+      });
+    }
 
     // Then add timeframe tasks
     timeframeTasks?.forEach(task => {
@@ -269,7 +268,6 @@ export const createTask = async (task) => {
       throw new Error('User must be authenticated to create tasks');
     }
 
-    // The due_date is already in YYYY-MM-DD format from the form
     const newTask = {
       title: task.title.trim(),
       description: task.description?.trim() || '',
@@ -278,6 +276,7 @@ export const createTask = async (task) => {
       category: task.category || 'work',
       completed: false,
       escalated: false,
+      pinned: false,
       user_id: user.id
     };
 
@@ -317,17 +316,7 @@ export const createTask = async (task) => {
 
     // Return formatted task for frontend
     return {
-      data: {
-        id: createdTask.id,
-        title: createdTask.title,
-        description: createdTask.description,
-        dueDate: createdTask.due_date,
-        priority: createdTask.priority,
-        category: createdTask.category,
-        completed: createdTask.completed,
-        escalated: createdTask.escalated,
-        tags: tags
-      },
+      data: formatTasks([{ ...createdTask, tags }])[0],
       error: null
     };
   } catch (error) {
@@ -339,69 +328,58 @@ export const createTask = async (task) => {
 // Update an existing task
 export const updateTask = async (task) => {
   try {
-    const { id, title, description, due_date, priority, category, completed, escalated, pinned, tags, listItems } = task;
-
-    // Get the current user's ID
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
-      console.error('Authentication error: No user found');
       throw new Error('User must be authenticated to update tasks');
     }
 
-    // Update the task
+    // Extract task fields, using either due_date or dueDate
     const updatedTask = {
-      title: title.trim(),
-      description: description?.trim() || '',
-      due_date: due_date,
-      priority: priority || 'medium',
-      category: category || 'work',
-      completed: completed || false,
-      escalated: escalated || false,
-      pinned: pinned || false,
-      has_list: Boolean(listItems?.length),
-      updated_at: new Date().toISOString(),
-      user_id: user.id  // Ensure we're updating the correct user's task
+      title: task.title.trim(),
+      description: task.description?.trim() || '',
+      due_date: task.due_date || task.dueDate, // Handle both field names
+      priority: task.priority || 'medium',
+      category: task.category || 'work',
+      completed: task.completed || false,
+      escalated: task.escalated || false,
+      pinned: task.pinned || false,
+      has_list: Boolean(task.listItems?.length),
+      updated_at: new Date().toISOString()
     };
 
-    console.log('Sending update to database:', updatedTask);
+    console.log('Updating task in database:', { id: task.id, ...updatedTask });
 
+    // Update the task
     const { data: taskData, error: taskError } = await supabase
       .from('tasks')
       .update(updatedTask)
-      .eq('id', id)
-      .eq('user_id', user.id)  // Additional safety check
+      .eq('id', task.id)
+      .eq('user_id', user.id)
       .select()
       .single();
 
     if (taskError) {
-      console.error('Database error updating task:', taskError);
+      console.error('Error updating task:', taskError);
       throw taskError;
     }
 
-    console.log('Task update successful:', taskData);
-
     // Handle tags if present
     let updatedTags = [];
-    if (tags && tags.length > 0) {
-      // Remove all existing tags for this task
-      const { error: tagDeleteError } = await supabase
+    if (task.tags && task.tags.length > 0) {
+      // Remove existing tags
+      await supabase
         .from('task_tags')
         .delete()
-        .eq('task_id', id);
+        .eq('task_id', task.id);
 
-      if (tagDeleteError) {
-        console.error('Error deleting existing tags:', tagDeleteError);
-        throw tagDeleteError;
-      }
-
-      // Add the new tags
-      const taskTagInserts = tags.map(tag => ({
-        task_id: id,
+      // Add new tags
+      const taskTagInserts = task.tags.map(tag => ({
+        task_id: task.id,
         tag_id: typeof tag === 'object' ? tag.id : tag
       }));
 
-      const { data: insertedTags, error: tagInsertError } = await supabase
+      const { data: taskTags } = await supabase
         .from('task_tags')
         .insert(taskTagInserts)
         .select(`
@@ -409,61 +387,16 @@ export const updateTask = async (task) => {
           tag:tags(*)
         `);
 
-      if (tagInsertError) {
-        console.error('Error inserting new tags:', tagInsertError);
-        throw tagInsertError;
-      }
-
-      updatedTags = insertedTags.map(tt => ({
-        id: tt.tag.id,
-        name: tt.tag.name,
-        color: tt.tag.color
-      }));
-    }
-
-    // Handle list items if present
-    let updatedListItems = [];
-    if (listItems) {
-      // Delete all existing list items
-      const { error: deleteListError } = await supabase
-        .from('list_items')
-        .delete()
-        .eq('task_id', id);
-
-      if (deleteListError) {
-        console.error('Error deleting existing list items:', deleteListError);
-        throw deleteListError;
-      }
-
-      if (listItems.length > 0) {
-        // Add the new list items
-        const listItemInserts = listItems.map((item, index) => ({
-          task_id: id,
-          text: item.text,
-          completed: item.completed || false,
-          position: item.position !== undefined ? item.position : index
-        }));
-
-        const { data: insertedItems, error: listItemError } = await supabase
-          .from('list_items')
-          .insert(listItemInserts)
-          .select();
-
-        if (listItemError) {
-          console.error('Error inserting list items:', listItemError);
-          throw listItemError;
-        }
-
-        updatedListItems = insertedItems.map(item => ({
-          id: item.id,
-          text: item.text,
-          completed: item.completed,
-          position: item.position
+      if (taskTags) {
+        updatedTags = taskTags.map(tt => ({
+          id: tt.tag.id,
+          name: tt.tag.name,
+          color: tt.tag.color
         }));
       }
     }
 
-    // Format the response
+    // Return formatted task
     const formattedTask = {
       id: taskData.id,
       title: taskData.title,
@@ -476,7 +409,7 @@ export const updateTask = async (task) => {
       pinned: taskData.pinned,
       hasListItems: taskData.has_list,
       tags: updatedTags,
-      listItems: updatedListItems
+      listItems: task.listItems || []
     };
 
     return { data: formattedTask, error: null };
