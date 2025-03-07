@@ -269,26 +269,11 @@ export const createTask = async (task) => {
       throw new Error('User must be authenticated to create tasks');
     }
 
-    // Convert the input date to local midnight
-    const localDate = new Date(task.due_date);
-    localDate.setHours(0, 0, 0, 0);
-    
-    // Convert local midnight to UTC for storage
-    const offset = localDate.getTimezoneOffset();
-    const utcDate = new Date(localDate.getTime() - (offset * 60 * 1000));
-    const dateStr = utcDate.toISOString();
-
-    console.log('Task date conversion:', {
-      inputDate: task.due_date,
-      localMidnight: localDate.toISOString(),
-      timezoneOffset: offset,
-      utcForStorage: dateStr
-    });
-
+    // The due_date is already in YYYY-MM-DD format from the form
     const newTask = {
       title: task.title.trim(),
       description: task.description?.trim() || '',
-      due_date: dateStr,
+      due_date: task.due_date,
       priority: task.priority || 'medium',
       category: task.category || 'work',
       completed: false,
@@ -354,7 +339,7 @@ export const createTask = async (task) => {
 // Update an existing task
 export const updateTask = async (task) => {
   try {
-    const { id, title, description, dueDate, priority, category, completed, escalated, pinned, hasListItems, tags, listItems } = task;
+    const { id, title, description, due_date, priority, category, completed, escalated, pinned, tags, listItems } = task;
 
     // Get the current user's ID
     const { data: { user } } = await supabase.auth.getUser();
@@ -364,33 +349,17 @@ export const updateTask = async (task) => {
       throw new Error('User must be authenticated to update tasks');
     }
 
-    // Convert the input date to local midnight
-    const localDate = new Date(dueDate);
-    localDate.setHours(0, 0, 0, 0);
-    
-    // Convert local midnight to UTC for storage
-    const offset = localDate.getTimezoneOffset();
-    const utcDate = new Date(localDate.getTime() - (offset * 60 * 1000));
-    
-    console.log('Update task date conversion:', { 
-      inputDate: dueDate,
-      localMidnight: localDate.toISOString(),
-      timezoneOffset: offset,
-      utcForStorage: utcDate.toISOString(),
-      taskData: task 
-    });
-
     // Update the task
     const updatedTask = {
       title: title.trim(),
       description: description?.trim() || '',
-      due_date: utcDate.toISOString(),
+      due_date: due_date,
       priority: priority || 'medium',
       category: category || 'work',
       completed: completed || false,
       escalated: escalated || false,
       pinned: pinned || false,
-      has_list: hasListItems || false,
+      has_list: Boolean(listItems?.length),
       updated_at: new Date().toISOString(),
       user_id: user.id  // Ensure we're updating the correct user's task
     };
@@ -454,7 +423,7 @@ export const updateTask = async (task) => {
 
     // Handle list items if present
     let updatedListItems = [];
-    if (hasListItems && listItems) {
+    if (listItems) {
       // Delete all existing list items
       const { error: deleteListError } = await supabase
         .from('list_items')

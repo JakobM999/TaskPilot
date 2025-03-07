@@ -129,7 +129,14 @@ function TaskList({
 
   const handleOpenEditDialog = (task) => {
     setIsEditing(true);
-    setCurrentTask({ ...task });
+    // Format the date to YYYY-MM-DD for the date input
+    const taskDate = new Date(task.dueDate);
+    setCurrentTask({
+      ...task,
+      dueDate: taskDate.toISOString().split('T')[0],
+      tags: task.tags || [],
+      listItems: task.listItems || []
+    });
     setOpenDialog(true);
   };
 
@@ -139,46 +146,29 @@ function TaskList({
   };
 
   const handleSaveTask = () => {
-    // First set the date to local midnight in Denmark
-    const taskDate = new Date(currentTask.dueDate);
-    taskDate.setHours(0, 0, 0, 0);
-    
-    console.log('Saving task with date:', {
-      original: currentTask.dueDate,
-      localMidnight: taskDate.toISOString()
-    });
-
     const taskToSave = {
-      id: currentTask.id, // Make sure to include the ID when editing
+      ...(isEditing ? { id: currentTask.id } : {}),
       title: currentTask.title.trim(),
       description: currentTask.description?.trim() || '',
-      dueDate: taskDate.toISOString(),
+      due_date: currentTask.dueDate, // Pass the date directly from the date input
       priority: currentTask.priority || 'medium',
       category: currentTask.category || 'work',
       completed: currentTask.completed || false,
       escalated: currentTask.escalated || false,
       pinned: currentTask.pinned || false,
-      hasListItems: Boolean(currentTask.listItems?.length),
       tags: Array.isArray(currentTask.tags) ? currentTask.tags : [],
       listItems: Array.isArray(currentTask.listItems) ? currentTask.listItems : []
     };
     
+    console.log('Saving task:', taskToSave);
+
     if (isEditing) {
       onUpdateTask(taskToSave);
     } else {
       onCreateTask(taskToSave);
     }
 
-    setOpenDialog(false);
-    setCurrentTask({
-      title: '',
-      description: '',
-      dueDate: new Date().toISOString().split('T')[0],
-      priority: 'medium',
-      category: 'work',
-      tags: [],
-      listItems: []
-    });
+    handleCloseDialog();
   };
 
   const handleVoiceInput = () => {
@@ -649,11 +639,12 @@ function TaskList({
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid item xs={12}>
               <TextField
+                autoFocus
                 name="title"
                 label="Task Title"
                 fullWidth
                 required
-                value={currentTask.title}
+                value={currentTask.title || ''}
                 onChange={handleInputChange}
                 InputProps={{
                   endAdornment: (
