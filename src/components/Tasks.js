@@ -43,6 +43,7 @@ function Tasks({ user, onLogout }) {
   const [currentTimeframe, setCurrentTimeframe] = useState('today');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('tasks');
+  const [message, setMessage] = useState({ text: '', type: 'info', open: false });
   const theme = useTheme();
 
   // Fetch tasks and initial AI advice
@@ -127,21 +128,37 @@ function Tasks({ user, onLogout }) {
     }
   };
 
-  const handleUpdateTask = async (updatedTask) => {
+  const handleUpdateTask = async (task) => {
+    // Log the task being updated for debugging
+    console.log('Updating task:', task);
+    
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      console.log('Updating task:', updatedTask);
-      const { data, error } = await updateTask(updatedTask);
+      const { data, error } = await updateTask(task);
       
       if (error) {
         console.error('Error updating task:', error);
-      } else {
-        console.log('Task updated successfully:', data);
-        // Update local state directly with the returned task data
-        setTasks(tasks.map(task => task.id === data.id ? data : task));
+        return;
       }
+      
+      // Update the local state with the updated task
+      setTasks(prevTasks => 
+        prevTasks.map(t => t.id === data.id ? data : t)
+      );
+      
+      // Show success message
+      setMessage({
+        text: 'Task updated successfully',
+        type: 'success',
+        open: true
+      });
     } catch (err) {
-      console.error('Error updating task:', err);
+      console.error('Error in handleUpdateTask:', err);
+      setMessage({
+        text: 'Failed to update task',
+        type: 'error',
+        open: true
+      });
     } finally {
       setIsLoading(false);
     }

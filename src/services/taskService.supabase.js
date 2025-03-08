@@ -6,7 +6,6 @@ import { addDays, startOfToday, endOfToday, startOfTomorrow, endOfTomorrow,
 // Get tasks based on timeframe
 export const getTasks = async (timeframe = 'today') => {
   try {
-    // Get the current user's ID
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
@@ -16,20 +15,13 @@ export const getTasks = async (timeframe = 'today') => {
 
     // Get current date in Danish local time
     const now = new Date();
-    // Set to start of day in local time
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    // Get timezone offset in minutes
-    const offset = today.getTimezoneOffset();
-    // Convert to UTC for Postgres comparison (subtract offset because getTimezoneOffset returns reverse value)
-    const utcDate = new Date(today.getTime() - (offset * 60 * 1000));
-    const todayStr = utcDate.toISOString().split('T')[0];
+    // Set to noon in local time to avoid any DST issues
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
 
     console.log('Date debugging:', {
       localNow: now.toLocaleString('da-DK'),
       localToday: today.toLocaleString('da-DK'),
-      offset,
-      utcDate: utcDate.toISOString(),
       todayStr,
       timeframe
     });
@@ -78,16 +70,14 @@ export const getTasks = async (timeframe = 'today') => {
       case 'tomorrow':
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowUTC = new Date(tomorrow.getTime() - (offset * 60 * 1000));
-        const tomorrowStr = tomorrowUTC.toISOString().split('T')[0];
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
         query = query.eq('due_date::date', tomorrowStr);
         break;
       
       case 'week':
         const weekEnd = new Date(today);
         weekEnd.setDate(weekEnd.getDate() + 7);
-        const weekEndUTC = new Date(weekEnd.getTime() - (offset * 60 * 1000));
-        const weekEndStr = weekEndUTC.toISOString().split('T')[0];
+        const weekEndStr = weekEnd.toISOString().split('T')[0];
         query = query
           .gte('due_date::date', todayStr)
           .lte('due_date::date', weekEndStr);
@@ -96,8 +86,7 @@ export const getTasks = async (timeframe = 'today') => {
       case 'month':
         const monthEnd = new Date(today);
         monthEnd.setDate(monthEnd.getDate() + 30);
-        const monthEndUTC = new Date(monthEnd.getTime() - (offset * 60 * 1000));
-        const monthEndStr = monthEndUTC.toISOString().split('T')[0];
+        const monthEndStr = monthEnd.toISOString().split('T')[0];
         query = query
           .gte('due_date::date', todayStr)
           .lte('due_date::date', monthEndStr);
@@ -342,24 +331,44 @@ export const updateTask = async (task) => {
       throw new Error('User must be authenticated to update tasks');
     }
 
-    // Extract task fields, using either due_date or dueDate
+    // Make sure we have an ISO format date string
+    let formattedDueDate;
+    
+    if (task.dueDate) {
+      // Handle date strings from date input (YYYY-MM-DD format)
+      if (!task.dueDate.includes('T')) {
+        // Convert simple date to ISO with time while preserving the local date
+        const dateObj = new Date(task.dueDate);
+        // Set to noon in local time to avoid any DST issues
+        dateObj.setHours(12, 0, 0, 0);
+        // Store in UTC but preserve the local date by subtracting the offset
+        formattedDueDate = dateObj.toISOString();
+      } else {
+        // Already in ISO format
+        formattedDueDate = task.dueDate;
+      }
+    } else if (task.due_date) {
+      formattedDueDate = task.due_date;
+    } else {
+      const now = new Date();
+      now.setHours(12, 0, 0, 0);
+      formattedDueDate = now.toISOString();
+    }
+
+    // Build the update object with only the fields that exist in the database
     const updatedTask = {
       title: task.title.trim(),
       description: task.description?.trim() || '',
-      due_date: task.due_date || task.dueDate, // Handle both field names
+      due_date: formattedDueDate,
       priority: task.priority || 'medium',
       category: task.category || 'work',
-      completed: task.completed || false,
-      escalated: task.escalated || false,
-      pinned: task.pinned || false,
-      has_list: Boolean(task.listItems?.length),
+      completed: Boolean(task.completed),
+      escalated: Boolean(task.escalated),
+      pinned: Boolean(task.pinned),
       updated_at: new Date().toISOString(),
-      // Add recurrence information
       is_recurring: Boolean(task.isRecurring),
-      recurrence_pattern: task.recurrencePattern || null
+      recurrence_pattern: task.isRecurring ? task.recurrencePattern : null
     };
-
-    console.log('Updating task in database:', { id: task.id, ...updatedTask });
 
     // Update the task
     const { data: taskData, error: taskError } = await supabase
@@ -367,30 +376,38 @@ export const updateTask = async (task) => {
       .update(updatedTask)
       .eq('id', task.id)
       .eq('user_id', user.id)
-      .select()
+      .select(`
+        *,
+        tags:task_tags(
+          id,
+          tag:tags(*)
+        ),
+        list_items(*)
+      `)
       .single();
-
+      
     if (taskError) {
       console.error('Error updating task:', taskError);
       throw taskError;
     }
 
-    // Handle tags if present
-    let updatedTags = [];
-    if (task.tags && task.tags.length > 0) {
-      // Remove existing tags
-      await supabase
-        .from('task_tags')
-        .delete()
-        .eq('task_id', task.id);
+    // Handle tags
+    // First, remove all existing tags
+    await supabase
+      .from('task_tags')
+      .delete()
+      .eq('task_id', task.id);
 
-      // Add new tags
+    let updatedTags = [];
+    
+    // Then add new tags if any are provided
+    if (task.tags && task.tags.length > 0) {
       const taskTagInserts = task.tags.map(tag => ({
         task_id: task.id,
         tag_id: typeof tag === 'object' ? tag.id : tag
       }));
 
-      const { data: taskTags } = await supabase
+      const { data: taskTags, error: tagError } = await supabase
         .from('task_tags')
         .insert(taskTagInserts)
         .select(`
@@ -398,7 +415,7 @@ export const updateTask = async (task) => {
           tag:tags(*)
         `);
 
-      if (taskTags) {
+      if (!tagError && taskTags) {
         updatedTags = taskTags.map(tt => ({
           id: tt.tag.id,
           name: tt.tag.name,
@@ -407,14 +424,15 @@ export const updateTask = async (task) => {
       }
     }
 
-    // Return formatted task
-    const formattedTask = formatTasks([{
-      ...taskData,
-      tags: updatedTags || [],
-      listItems: task.listItems || []
-    }])[0];
-
-    return { data: formattedTask, error: null };
+    // Return a complete task object for the frontend with all relationships
+    return { 
+      data: formatTasks([{
+        ...taskData,
+        tags: updatedTags,
+        list_items: task.listItems || []
+      }])[0],
+      error: null 
+    };
   } catch (error) {
     console.error('Error in updateTask:', error);
     return { data: null, error };
@@ -750,7 +768,6 @@ export const toggleTaskCompletion = async (taskId) => {
 // Reschedule an overdue task
 export const rescheduleTask = async (taskId) => {
   try {
-    // Get the current user's ID
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
@@ -780,13 +797,11 @@ export const rescheduleTask = async (taskId) => {
       tomorrow.setDate(tomorrow.getDate() + 3);
     }
     
-    // Set time to midnight local time
-    tomorrow.setHours(0, 0, 0, 0);
+    // Set to noon in local time to avoid any DST issues
+    tomorrow.setHours(12, 0, 0, 0);
     
-    // Convert to UTC for storage
-    const offset = tomorrow.getTimezoneOffset();
-    const utcDate = new Date(tomorrow.getTime() - (offset * 60 * 1000));
-    const formattedDate = utcDate.toISOString();
+    // Store as ISO string
+    const formattedDate = tomorrow.toISOString();
 
     // Update the task with new due date and escalate it
     const { data, error: updateError } = await supabase

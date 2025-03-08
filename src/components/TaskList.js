@@ -175,8 +175,8 @@ function TaskList({
       pinned: currentTask.pinned || false,
       tags: currentTask.tags || [],
       listItems: currentTask.listItems || [],
-      isRecurring: currentTask.isRecurring,
-      recurrencePattern: currentTask.recurrencePattern
+      isRecurring: Boolean(currentTask.isRecurring),
+      recurrencePattern: currentTask.isRecurring ? currentTask.recurrencePattern : null
     };
     
     console.log('Saving task:', task);
