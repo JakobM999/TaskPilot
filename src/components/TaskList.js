@@ -26,6 +26,7 @@ import {
   InputAdornment,
   Fab,
   Autocomplete,
+  FormHelperText,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -39,6 +40,8 @@ import ScheduleIcon from '@mui/icons-material/Schedule';
 import CategoryIcon from '@mui/icons-material/Category';
 import LabelIcon from '@mui/icons-material/Label';
 import PushPinIcon from '@mui/icons-material/PushPin';
+import RepeatIcon from '@mui/icons-material/Repeat';
+import ClearIcon from '@mui/icons-material/Clear';
 import { getUserTags, createTag } from '../services';
 
 function TaskList({
@@ -64,7 +67,9 @@ function TaskList({
     priority: 'medium',
     category: 'work', // Default to work
     tags: [], // Add tags array
-    listItems: [] // Add listItems array
+    listItems: [], // Add listItems array
+    isRecurring: false, // Add recurring flag
+    recurrencePattern: null // Add recurrence pattern
   });
   const [timeframe, setTimeframe] = useState(currentTimeframe);
   const [categoryFilter, setCategoryFilter] = useState('work'); // Default to work
@@ -123,7 +128,9 @@ function TaskList({
       priority: 'medium',
       category: 'work', // Default to work
       tags: [],
-      listItems: []
+      listItems: [],
+      isRecurring: false,
+      recurrencePattern: null
     });
     setOpenDialog(true);
   };
@@ -142,7 +149,9 @@ function TaskList({
       escalated: task.escalated || false,
       pinned: task.pinned || false,
       tags: task.tags || [],
-      listItems: task.listItems || []
+      listItems: task.listItems || [],
+      isRecurring: task.isRecurring || false,
+      recurrencePattern: task.recurrencePattern || null
     });
     setOpenDialog(true);
   };
@@ -165,7 +174,9 @@ function TaskList({
       escalated: currentTask.escalated || false,
       pinned: currentTask.pinned || false,
       tags: currentTask.tags || [],
-      listItems: currentTask.listItems || []
+      listItems: currentTask.listItems || [],
+      isRecurring: currentTask.isRecurring,
+      recurrencePattern: currentTask.recurrencePattern
     };
     
     console.log('Saving task:', task);
@@ -306,6 +317,24 @@ function TaskList({
     return tasks.filter(task => 
       task.tags && task.tags.some(tag => tag.id === tagId)
     );
+  };
+
+  const recurrencePatterns = [
+    { value: null, label: 'None' },
+    { value: { frequency: 'daily', interval: 1 }, label: 'Daily' },
+    { value: { frequency: 'daily', interval: 2 }, label: 'Every 2 days' },
+    { value: { frequency: 'weekly', interval: 1 }, label: 'Weekly' },
+    { value: { frequency: 'weekly', interval: 2 }, label: 'Every 2 weeks' },
+    { value: { frequency: 'monthly', interval: 1 }, label: 'Monthly' },
+    { value: { frequency: 'yearly', interval: 1 }, label: 'Yearly' },
+  ];
+
+  const handleRecurrenceChange = (selectedPattern) => {
+    setCurrentTask((prev) => ({
+      ...prev,
+      isRecurring: selectedPattern !== null,
+      recurrencePattern: selectedPattern
+    }));
   };
 
   if (isLoading) {
@@ -476,7 +505,7 @@ function TaskList({
                     backgroundColor: task.completed ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
                     borderRadius: 1,
                     mb: 1,
-                    border: 1,
+                    border: task.pinned || isOverdue ? 2 : 1, // Make the border thicker (2px) for pinned/overdue tasks
                     borderColor: 
                       isOverdue ? 'error.main' : 
                       task.pinned ? 'primary.main' :
@@ -571,6 +600,11 @@ function TaskList({
                         >
                           {task.title}
                         </Typography>
+                        {task.isRecurring && (
+                          <Tooltip title="Recurring Task">
+                            <RepeatIcon fontSize="small" color="primary" sx={{ ml: 0.5 }} />
+                          </Tooltip>
+                        )}
                         <Chip
                           label={task.priority}
                           size="small"
@@ -810,6 +844,36 @@ function TaskList({
                   Add
                 </Button>
               </Box>
+            </Grid>
+
+            {/* Recurrence section */}
+            <Grid item xs={12}>
+              <Divider textAlign="left" sx={{ mt: 1, mb: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Recurrence
+                </Typography>
+              </Divider>
+              
+              <FormControl fullWidth>
+                <InputLabel>Repeat</InputLabel>
+                <Select
+                  value={currentTask.recurrencePattern ? JSON.stringify(currentTask.recurrencePattern) : ''}
+                  onChange={(e) => handleRecurrenceChange(e.target.value ? JSON.parse(e.target.value) : null)}
+                  label="Repeat"
+                >
+                  {recurrencePatterns.map((pattern) => (
+                    <MenuItem key={pattern.label} value={pattern.value ? JSON.stringify(pattern.value) : ''}>
+                      {pattern.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {currentTask.isRecurring && (
+                  <FormHelperText>
+                    Task will automatically repeat {currentTask.recurrencePattern?.frequency} 
+                    {currentTask.recurrencePattern?.interval > 1 ? ` every ${currentTask.recurrencePattern.interval} ${currentTask.recurrencePattern.frequency.slice(0, -2)}s` : ''}
+                  </FormHelperText>
+                )}
+              </FormControl>
             </Grid>
           </Grid>
         </DialogContent>

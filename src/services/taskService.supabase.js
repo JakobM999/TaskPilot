@@ -173,6 +173,11 @@ const formatTasks = (tasks) => {
     escalated: task.escalated,
     pinned: task.pinned || false,
     hasListItems: task.has_list,
+    // Add recurrence information
+    isRecurring: task.is_recurring || false,
+    recurrencePattern: task.recurrence_pattern || null,
+    parentTaskId: task.parent_task_id || null,
+    nextInstanceDate: task.next_instance_date || null,
     tags: task.tags ? task.tags.map(t => ({
       id: t.tag.id,
       name: t.tag.name,
@@ -277,7 +282,10 @@ export const createTask = async (task) => {
       completed: false,
       escalated: false,
       pinned: false,
-      user_id: user.id
+      user_id: user.id,
+      // Add recurrence information
+      is_recurring: Boolean(task.isRecurring),
+      recurrence_pattern: task.recurrencePattern || null
     };
 
     // Insert the task
@@ -345,7 +353,10 @@ export const updateTask = async (task) => {
       escalated: task.escalated || false,
       pinned: task.pinned || false,
       has_list: Boolean(task.listItems?.length),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      // Add recurrence information
+      is_recurring: Boolean(task.isRecurring),
+      recurrence_pattern: task.recurrencePattern || null
     };
 
     console.log('Updating task in database:', { id: task.id, ...updatedTask });
@@ -397,20 +408,11 @@ export const updateTask = async (task) => {
     }
 
     // Return formatted task
-    const formattedTask = {
-      id: taskData.id,
-      title: taskData.title,
-      description: taskData.description,
-      dueDate: taskData.due_date,
-      priority: taskData.priority,
-      category: taskData.category,
-      completed: taskData.completed,
-      escalated: taskData.escalated,
-      pinned: taskData.pinned,
-      hasListItems: taskData.has_list,
-      tags: updatedTags,
+    const formattedTask = formatTasks([{
+      ...taskData,
+      tags: updatedTags || [],
       listItems: task.listItems || []
-    };
+    }])[0];
 
     return { data: formattedTask, error: null };
   } catch (error) {
