@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { showNotification } from '../services/notificationService';
+import { notificationService } from '../services/notificationService';
 
 export const useNotifications = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -30,10 +30,21 @@ export const useNotifications = () => {
       if (permission === 'granted') {
         setNotificationsEnabled(true);
         localStorage.setItem('notifications_enabled', 'true');
-        showNotification('Notifications Enabled', {
-          body: 'You will now receive notifications for upcoming tasks',
-          tag: 'notification-enabled'
-        });
+        // Use the current user ID if available, otherwise just show a browser notification
+        const userId = localStorage.getItem('userId');
+        if (userId) {
+          notificationService.sendNotification(
+            userId, 
+            'Notifications Enabled', 
+            'You will now receive notifications for upcoming tasks'
+          );
+        } else {
+          // Fallback to browser notification
+          new Notification('Notifications Enabled', {
+            body: 'You will now receive notifications for upcoming tasks',
+            tag: 'notification-enabled'
+          });
+        }
         return true;
       }
     } catch (error) {

@@ -35,6 +35,7 @@ import {
   Schedule as ScheduleIcon,
   Timer as TimerIcon,
   SmartToy as SmartToyIcon,
+  Telegram as TelegramIcon,
   Language as LanguageIcon,
   RestartAlt as RestartAltIcon,
   AccessTime as AccessTimeIcon,
@@ -53,10 +54,15 @@ import {
   Engineering as EngineeringIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Add as AddIcon,
+  Event as EventIcon,
+  CalendarMonth as CalendarIcon,
 } from '@mui/icons-material';
 import { testSupabaseConnection } from '../services/testSupabase';
 import { verifySupabaseSchema } from '../services/verifySchema';
 import { useNotifications } from '../hooks/useNotifications';
+import { telegramBot } from '../services/telegramBot';
+import supabase from '../services/supabaseClient';
 
 // Tab panel component to wrap content for each tab
 function TabPanel(props) {
@@ -355,14 +361,55 @@ function FeatureUpgrades({ featureUpgrades, setFeatureUpgrades, handleToggleFeat
 function Settings() {
   const [currentTab, setCurrentTab] = useState(0);
   
-  // Theme settings
-  const [darkMode, setDarkMode] = useState(false);
-  const [language, setLanguage] = useState('en');
+// Theme settings
+const [darkMode, setDarkMode] = useState(false);
+const [language, setLanguage] = useState('en');
+
+// Telegram settings
+const [telegramConnected, setTelegramConnected] = useState(false);
+const [userId, setUserId] = useState(null);
+
+// Get current user ID
+useEffect(() => {
+  const fetchUserId = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setUserId(user?.id);
+  };
+  fetchUserId();
+}, []);
 
   // Notification settings
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [desktopNotifications, setDesktopNotifications] = useState(true);
   const [reminderTime, setReminderTime] = useState(15);
+  const [dailySummaryEnabled, setDailySummaryEnabled] = useState(false);
+  const [dailySummaryTime, setDailySummaryTime] = useState('09:00');
+  const [weeklySummaryEnabled, setWeeklySummaryEnabled] = useState(false);
+  const [weeklySummaryDay, setWeeklySummaryDay] = useState(1);
+  const [weeklySummaryTime, setWeeklySummaryTime] = useState('09:00');
+  const [monthlySummaryEnabled, setMonthlySummaryEnabled] = useState(false);
+  const [monthlySummaryDay, setMonthlySummaryDay] = useState(1);
+  const [monthlySummaryTime, setMonthlySummaryTime] = useState('09:00');
+  const [customNotifications, setCustomNotifications] = useState([]);
+
+  const handleCustomNotificationChange = (index, field, value) => {
+    setCustomNotifications(prev => prev.map((notification, i) => 
+      i === index ? { ...notification, [field]: value } : notification
+    ));
+  };
+
+  const addCustomNotification = () => {
+    setCustomNotifications(prev => [...prev, {
+      id: Date.now().toString(),
+      title: '',
+      message: '',
+      time: '09:00',
+    }]);
+  };
+
+  const removeCustomNotification = (index) => {
+    setCustomNotifications(prev => prev.filter((_, i) => i !== index));
+  };
 
   // Task management settings
   const [workingHoursStart, setWorkingHoursStart] = useState('09:00');
@@ -452,6 +499,119 @@ function Settings() {
     toggleNotifications 
   } = useNotifications();
 
+  // Auto-save settings whenever they change
+  useEffect(() => {
+    const settings = {
+      appearance: { darkMode, language },
+      notifications: { 
+        emailNotifications, 
+        desktopNotifications, 
+        reminderTime,
+        dailySummary: dailySummaryEnabled,
+        dailySummaryTime,
+        weeklySummary: weeklySummaryEnabled,
+        weeklySummaryDay,
+        weeklySummaryTime,
+        monthlySummary: monthlySummaryEnabled,
+        monthlySummaryDay,
+        monthlySummaryTime,
+        customNotifications
+      },
+      taskManagement: { 
+        workingHoursStart, 
+        workingHoursEnd, 
+        defaultTaskDuration,
+        autoEscalateOverdue 
+      },
+      aiAssistant: { 
+        aiEnabled, 
+        aiSuggestionFrequency,
+        focusTimeLength,
+        breakTimeLength 
+      },
+      calendar: { calendarSync, blockCalendarEvents }
+    };
+    
+    localStorage.setItem('taskpilot_settings', JSON.stringify(settings));
+  }, [
+    darkMode, language,
+    emailNotifications, desktopNotifications, reminderTime,
+    dailySummaryEnabled, dailySummaryTime,
+    weeklySummaryEnabled, weeklySummaryDay, weeklySummaryTime,
+    monthlySummaryEnabled, monthlySummaryDay, monthlySummaryTime,
+    customNotifications,
+    workingHoursStart, workingHoursEnd, defaultTaskDuration, autoEscalateOverdue,
+    aiEnabled, aiSuggestionFrequency, focusTimeLength, breakTimeLength,
+    calendarSync, blockCalendarEvents
+  ]);
+
+  // Check Telegram connection status
+  useEffect(() => {
+    if (userId) {
+      const checkTelegramConnection = async () => {
+        const isConnected = await telegramBot.isConnected(userId);
+        setTelegramConnected(isConnected);
+      };
+      checkTelegramConnection();
+    }
+  }, [userId]);
+
+  // Load saved settings and feature upgrades from localStorage on component mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('taskpilot_settings');
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        
+        // Load notification settings
+        if (settings.notifications) {
+          setEmailNotifications(settings.notifications.emailNotifications ?? true);
+          setDesktopNotifications(settings.notifications.desktopNotifications ?? true);
+          setReminderTime(settings.notifications.reminderTime ?? 15);
+          setDailySummaryEnabled(settings.notifications.dailySummary ?? false);
+          setDailySummaryTime(settings.notifications.dailySummaryTime ?? '09:00');
+          setWeeklySummaryEnabled(settings.notifications.weeklySummary ?? false);
+          setWeeklySummaryDay(settings.notifications.weeklySummaryDay ?? 1);
+          setWeeklySummaryTime(settings.notifications.weeklySummaryTime ?? '09:00');
+          setMonthlySummaryEnabled(settings.notifications.monthlySummary ?? false);
+          setMonthlySummaryDay(settings.notifications.monthlySummaryDay ?? 1);
+          setMonthlySummaryTime(settings.notifications.monthlySummaryTime ?? '09:00');
+          setCustomNotifications(settings.notifications.customNotifications ?? []);
+        }
+
+        // Load theme settings
+        if (settings.appearance) {
+          setDarkMode(settings.appearance.darkMode ?? false);
+          setLanguage(settings.appearance.language ?? 'en');
+        }
+
+        // Load task management settings
+        if (settings.taskManagement) {
+          setWorkingHoursStart(settings.taskManagement.workingHoursStart ?? '09:00');
+          setWorkingHoursEnd(settings.taskManagement.workingHoursEnd ?? '17:00');
+          setDefaultTaskDuration(settings.taskManagement.defaultTaskDuration ?? 30);
+          setAutoEscalateOverdue(settings.taskManagement.autoEscalateOverdue ?? true);
+        }
+
+        // Load AI settings
+        if (settings.aiAssistant) {
+          setAiEnabled(settings.aiAssistant.aiEnabled ?? true);
+          setAiSuggestionFrequency(settings.aiAssistant.aiSuggestionFrequency ?? 'medium');
+          setFocusTimeLength(settings.aiAssistant.focusTimeLength ?? 25);
+          setBreakTimeLength(settings.aiAssistant.breakTimeLength ?? 5);
+        }
+
+        // Load calendar settings
+        if (settings.calendar) {
+          setCalendarSync(settings.calendar.calendarSync ?? true);
+          setBlockCalendarEvents(settings.calendar.blockCalendarEvents ?? true);
+        }
+      } catch (error) {
+        console.error('Error loading saved settings:', error);
+      }
+    }
+  }, []);
+
   // Load saved feature upgrades from localStorage on component mount
   useEffect(() => {
     const savedUpgrades = localStorage.getItem('taskpilot_feature_upgrades');
@@ -511,7 +671,20 @@ function Settings() {
     // Save all settings including feature upgrades
     const settings = {
       appearance: { darkMode, language },
-      notifications: { emailNotifications, desktopNotifications, reminderTime },
+      notifications: { 
+        emailNotifications, 
+        desktopNotifications, 
+        reminderTime,
+        dailySummary: dailySummaryEnabled,
+        dailySummaryTime,
+        weeklySummary: weeklySummaryEnabled,
+        weeklySummaryDay,
+        weeklySummaryTime,
+        monthlySummary: monthlySummaryEnabled,
+        monthlySummaryDay,
+        monthlySummaryTime,
+        customNotifications
+      },
       taskManagement: { 
         workingHoursStart, 
         workingHoursEnd, 
@@ -615,26 +788,31 @@ function Settings() {
           <Paper sx={{ width: '100%' }}>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
               <Tabs 
-                value={currentTab} 
-                onChange={handleTabChange} 
-                variant="scrollable"
-                scrollButtons="auto"
-              >
-                <Tab 
-                  icon={<SettingsIcon />} 
-                  iconPosition="start" 
-                  label="General" 
-                />
-                <Tab 
-                  icon={<EngineeringIcon />} 
-                  iconPosition="start" 
-                  label="Feature Upgrades" 
-                />
-                <Tab 
-                  icon={<StorageIcon />} 
-                  iconPosition="start" 
-                  label="Database" 
-                />
+              value={currentTab} 
+              onChange={handleTabChange} 
+              variant="scrollable"
+              scrollButtons="auto"
+            >
+              <Tab 
+                icon={<SettingsIcon />} 
+                iconPosition="start" 
+                label="General" 
+              />
+              <Tab 
+                icon={<NotificationsIcon />} 
+                iconPosition="start" 
+                label="Notifications" 
+              />
+              <Tab 
+                icon={<EngineeringIcon />} 
+                iconPosition="start" 
+                label="Feature Upgrades" 
+              />
+              <Tab 
+                icon={<StorageIcon />} 
+                iconPosition="start" 
+                label="Database" 
+              />
               </Tabs>
             </Box>
 
@@ -683,10 +861,41 @@ function Settings() {
                           <MenuItem value="es">Español</MenuItem>
                           <MenuItem value="fr">Français</MenuItem>
                         </Select>
-                      </ListItem>
-                    </List>
+                  </ListItem>
 
-                    <Divider sx={{ my: 2 }} />
+                  {/* Telegram Integration */}
+                  <ListItem>
+                    <ListItemIcon>
+                      <TelegramIcon />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary="Telegram Notifications" 
+                      secondary={telegramConnected 
+                        ? "Connected - You will receive notifications on Telegram" 
+                        : "Connect to receive notifications on Telegram"
+                      }
+                    />
+                    <Button
+                      variant="outlined"
+                      color={telegramConnected ? "error" : "primary"}
+                      onClick={() => {
+                        if (telegramConnected) {
+                          // Handle disconnect
+                          telegramBot.disconnect(userId);
+                          setTelegramConnected(false);
+                        } else {
+                          // Handle connect
+                          window.open(`https://t.me/TaskPilot_jm_bot?start=${userId}`, '_blank');
+                        }
+                      }}
+                      disabled={!userId}
+                    >
+                      {telegramConnected ? "Disconnect" : "Connect Telegram"}
+                    </Button>
+                  </ListItem>
+                </List>
+
+                <Divider sx={{ my: 2 }} />
 
                     <List subheader={
                       <ListSubheader sx={{ bgcolor: 'transparent', pl: 0 }}>
@@ -952,7 +1161,187 @@ function Settings() {
             </TabPanel>
 
             {/* Feature Upgrades Tab */}
+            {/* Notifications Tab */}
             <TabPanel value={currentTab} index={1}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <NotificationsIcon color="primary" />
+                  Notification Settings
+                </Typography>
+
+                <List>
+                  {/* Task Due Notifications */}
+                  <ListItem>
+                    <ListItemIcon>
+                      <TimerIcon />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary="Task Due Notifications" 
+                      secondary="Get notified before tasks are due"
+                    />
+                    <Switch
+                      checked={notificationsEnabled}
+                      onChange={toggleNotifications}
+                      disabled={notificationPermission === 'denied'}
+                    />
+                  </ListItem>
+
+                  {/* Daily Summary */}
+                  <ListItem>
+                    <ListItemIcon>
+                      <AccessTimeIcon />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary="Daily Summary" 
+                      secondary="Get a daily overview of your tasks"
+                    />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Switch
+                        checked={dailySummaryEnabled}
+                        onChange={(e) => setDailySummaryEnabled(e.target.checked)}
+                      />
+                      <TextField
+                        type="time"
+                        value={dailySummaryTime}
+                        onChange={(e) => setDailySummaryTime(e.target.value)}
+                        size="small"
+                        disabled={!dailySummaryEnabled}
+                      />
+                    </Box>
+                  </ListItem>
+
+                  {/* Weekly Summary */}
+                  <ListItem>
+                    <ListItemIcon>
+                      <EventIcon />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary="Weekly Summary" 
+                      secondary="Get a weekly overview of your tasks"
+                    />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Switch
+                        checked={weeklySummaryEnabled}
+                        onChange={(e) => setWeeklySummaryEnabled(e.target.checked)}
+                      />
+                      <Select
+                        value={weeklySummaryDay}
+                        onChange={(e) => setWeeklySummaryDay(e.target.value)}
+                        size="small"
+                        sx={{ width: 120 }}
+                        disabled={!weeklySummaryEnabled}
+                      >
+                        <MenuItem value={1}>Monday</MenuItem>
+                        <MenuItem value={2}>Tuesday</MenuItem>
+                        <MenuItem value={3}>Wednesday</MenuItem>
+                        <MenuItem value={4}>Thursday</MenuItem>
+                        <MenuItem value={5}>Friday</MenuItem>
+                        <MenuItem value={6}>Saturday</MenuItem>
+                        <MenuItem value={0}>Sunday</MenuItem>
+                      </Select>
+                      <TextField
+                        type="time"
+                        value={weeklySummaryTime}
+                        onChange={(e) => setWeeklySummaryTime(e.target.value)}
+                        size="small"
+                        disabled={!weeklySummaryEnabled}
+                      />
+                    </Box>
+                  </ListItem>
+
+                  {/* Monthly Summary */}
+                  <ListItem>
+                    <ListItemIcon>
+                      <CalendarIcon />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary="Monthly Summary" 
+                      secondary="Get a monthly overview of your tasks"
+                    />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Switch
+                        checked={monthlySummaryEnabled}
+                        onChange={(e) => setMonthlySummaryEnabled(e.target.checked)}
+                      />
+                      <TextField
+                        type="number"
+                        value={monthlySummaryDay}
+                        onChange={(e) => setMonthlySummaryDay(Number(e.target.value))}
+                        size="small"
+                        sx={{ width: 70 }}
+                        InputProps={{ inputProps: { min: 1, max: 28 } }}
+                        disabled={!monthlySummaryEnabled}
+                      />
+                      <TextField
+                        type="time"
+                        value={monthlySummaryTime}
+                        onChange={(e) => setMonthlySummaryTime(e.target.value)}
+                        size="small"
+                        disabled={!monthlySummaryEnabled}
+                      />
+                    </Box>
+                  </ListItem>
+                </List>
+
+                <Divider sx={{ my: 2 }} />
+
+                {/* Custom Notifications */}
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Custom Notifications
+                  </Typography>
+                  
+                  {customNotifications.map((notification, index) => (
+                    <Paper key={index} variant="outlined" sx={{ p: 2, mb: 2 }}>
+                      <Grid container spacing={2} alignItems="center">
+                        <Grid item xs={12} sm={4}>
+                          <TextField
+                            fullWidth
+                            label="Title"
+                            value={notification.title}
+                            onChange={(e) => handleCustomNotificationChange(index, 'title', e.target.value)}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <TextField
+                            fullWidth
+                            label="Message"
+                            value={notification.message}
+                            onChange={(e) => handleCustomNotificationChange(index, 'message', e.target.value)}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={3}>
+                          <TextField
+                            type="time"
+                            value={notification.time}
+                            onChange={(e) => handleCustomNotificationChange(index, 'time', e.target.value)}
+                            size="small"
+                            fullWidth
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={1}>
+                          <IconButton onClick={() => removeCustomNotification(index)} color="error">
+                            <DeleteIcon />
+                          </IconButton>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+                  ))}
+
+                  <Button
+                    variant="outlined"
+                    startIcon={<AddIcon />}
+                    onClick={addCustomNotification}
+                  >
+                    Add Custom Notification
+                  </Button>
+                </Box>
+              </Paper>
+            </TabPanel>
+
+            <TabPanel value={currentTab} index={2}>
               <Paper sx={{ p: 3 }}>
                 <FeatureUpgrades 
                   featureUpgrades={featureUpgrades}
@@ -973,7 +1362,7 @@ function Settings() {
             </TabPanel>
 
             {/* Database Tab */}
-            <TabPanel value={currentTab} index={2}>
+            <TabPanel value={currentTab} index={3}>
               <Paper sx={{ p: 3 }}>
                 <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <StorageIcon />

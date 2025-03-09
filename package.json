@@ -12,6 +12,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.6.7",
     "date-fns": "^4.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -19,11 +20,23 @@
     "react-scripts": "5.0.1",
     "web-vitals": "^2.1.4"
   },
+  "devDependencies": {
+    "@babel/preset-env": "^7.26.9",
+    "@babel/preset-react": "^7.26.3",
+    "babel-jest": "^29.7.0",
+    "dotenv": "^16.4.7",
+    "identity-obj-proxy": "^3.0.0",
+    "jest-junit": "^16.0.0",
+    "node-fetch": "^2.7.0"
+  },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "test:telegram": "jest telegram.test.js --config jest.config.js",
+    "test:telegram:integration": "jest telegram.integration.test.js --config jest.config.js --runInBand",
+    "test:telegram:all": "jest telegram.*.test.js --config jest.config.js --runInBand"
   },
   "eslintConfig": {
     "extends": [

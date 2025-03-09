@@ -42,6 +42,7 @@ import Calendar from './components/Calendar';
 
 // Services
 import { getCurrentUser } from './services/index';
+import { startNotificationChecker, stopNotificationChecker } from './services/notificationService';
 
 // Create AppWrapper to use hooks that require Router context
 function AppWrapper() {
@@ -125,6 +126,21 @@ function AppContent() {
 
     checkUser();
   }, []);
+
+  // Start notification checker when user is logged in
+  useEffect(() => {
+    let notificationInterval;
+    
+    if (user) {
+      notificationInterval = startNotificationChecker();
+    }
+
+    return () => {
+      if (notificationInterval) {
+        stopNotificationChecker(notificationInterval);
+      }
+    };
+  }, [user]);
 
   const handleLogin = (user) => {
     setUser(user);

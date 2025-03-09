@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="10" failures="0" errors="0" time="2.018">
+  <testsuite name="Telegram Integration Tests (Live)" errors="0" failures="0" skipped="10" timestamp="2025-03-09T10:24:33" time="1.176" tests="10">
+    <testcase classname="Telegram Integration Tests (Live) Message Sending" name="should send a simple text message" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Telegram Integration Tests (Live) Message Sending" name="should send a formatted task message" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Telegram Integration Tests (Live) Message Sending" name="should send a summary message" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Telegram Integration Tests (Live) Connection Management" name="should check connection status" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Telegram Integration Tests (Live) Connection Management" name="should disconnect and reconnect" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Telegram Integration Tests (Live) Error Handling" name="should handle invalid chat ID gracefully" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Telegram Integration Tests (Live) Error Handling" name="should handle rate limiting" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Telegram Integration Tests (Live) Message Formatting" name="should handle long messages" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Telegram Integration Tests (Live) Message Formatting" name="should handle special characters" time="0">
+      <skipped/>
+    </testcase>
+    <testcase classname="Telegram Integration Tests (Live) Message Formatting" name="should handle multi-line messages" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+</testsuites>
