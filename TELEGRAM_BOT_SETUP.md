@@ -40,27 +40,19 @@ openssl rand -hex 32
 
 ## 3. Database Setup
 
-1. Run the migration script:
-```sql
--- Create telegram_connections table
-create table telegram_connections (
-    user_id uuid references auth.users(id) primary key,
-    chat_id bigint not null,
-    connected_at timestamp with time zone default now(),
-    enabled boolean default true
-);
-
--- Add RLS policies
-alter table telegram_connections enable row level security;
-
-create policy "Users can view their own telegram connection"
-    on telegram_connections for select
-    using (auth.uid() = user_id);
-
-create policy "Users can manage their own telegram connection"
-    on telegram_connections for all
-    using (auth.uid() = user_id);
+1. Run the database migrations:
+```bash
+npm run migrate
 ```
+
+This will:
+- Create the telegram_connections table for managing bot connections
+- Add user settings for Telegram notifications
+- Setup Row Level Security (RLS) policies
+
+If you need to check the migration SQL, see:
+- `supabase/migrations/20250309_add_telegram_connections.sql`
+- `supabase/migrations/20250309_update_user_settings.sql`
 
 ## 4. Webhook Configuration
 
@@ -87,7 +79,11 @@ curl "https://api.telegram.org/bot${REACT_APP_TELEGRAM_BOT_TOKEN}/getWebhookInfo
 2. Go to Settings → Notifications
 3. Click "Connect Telegram"
 4. Open Telegram and start a chat with your bot
-5. Test notifications:
+5. Configure your notification preferences:
+   - Daily summaries
+   - Weekly summaries
+   - Monthly summaries
+6. Test notifications:
    - Create a task due in 5 minutes
    - You should receive both browser and Telegram notifications
 
@@ -110,6 +106,13 @@ curl "https://api.telegram.org/bot${REACT_APP_TELEGRAM_BOT_TOKEN}/getWebhookInfo
 - Verify bot permissions in Telegram
 - Check chat_id in telegram_connections table
 - Ensure webhook is receiving events
+- Verify user_settings table has correct telegram_settings
+
+### Settings Not Saving
+- Check if migrations ran successfully
+- Verify user_settings table structure
+- Ensure user is authenticated
+- Check browser console for errors
 
 ## 7. Security Notes
 
@@ -146,3 +149,27 @@ The bot will send notifications for:
    - User-defined alerts
    - System notifications
    - Important updates
+
+## 10. Verifying the Setup
+
+To verify everything is working:
+
+1. Check database tables:
+```sql
+select * from telegram_connections;
+select * from user_settings where telegram_settings is not null;
+```
+
+2. Test the connection:
+```bash
+npm run test:telegram:all
+```
+
+3. Send a test notification:
+```bash
+node scripts/send-telegram-test.js
+```
+
+4. Monitor webhook events:
+```bash
+tail -f logs/telegram-webhook.log

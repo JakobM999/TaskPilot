@@ -813,11 +813,6 @@ useEffect(() => {
                 iconPosition="start" 
                 label="Database" 
               />
-              <Tab 
-                icon={<TelegramIcon />} 
-                iconPosition="start" 
-                label="Telegram" 
-              />
               </Tabs>
             </Box>
 
@@ -1457,50 +1452,6 @@ useEffect(() => {
                     </>
                   )}
                 </Stack>
-              </Paper>
-            </TabPanel>
-
-            {/* After the Database tab panel */}
-            <TabPanel value={currentTab} index={4}>
-              <Paper sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <TelegramIcon color="primary" />
-                  Telegram Integration
-                </Typography>
-
-                <Box sx={{ mt: 3 }}>
-                  <Alert severity={telegramConnected ? "success" : "info"} sx={{ mb: 3 }}>
-                    {telegramConnected 
-                      ? "Your TaskPilot account is connected to Telegram. You will receive notifications about tasks, reminders, and summaries." 
-                      : "Connect your TaskPilot account to Telegram to receive notifications and task updates directly in your Telegram app."
-                    }
-                  </Alert>
-
-                  <Button
-                    variant="contained"
-                    color={telegramConnected ? "error" : "primary"}
-                    startIcon={<TelegramIcon />}
-                    onClick={() => {
-                      if (telegramConnected) {
-                        // Handle disconnect
-                        telegramBot.disconnect(userId);
-                        setTelegramConnected(false);
-                      } else {
-                        // Handle connect
-                        window.open(`https://t.me/TaskPilot_jm_bot?start=${userId}`, '_blank');
-                      }
-                    }}
-                    disabled={!userId}
-                  >
-                    {telegramConnected ? "Disconnect Telegram" : "Connect to Telegram"}
-                  </Button>
-
-                  {!userId && (
-                    <Typography color="error" sx={{ mt: 2 }}>
-                      You must be logged in to connect to Telegram.
-                    </Typography>
-                  )}
-                </Box>
               </Paper>
             </TabPanel>
           </Paper>

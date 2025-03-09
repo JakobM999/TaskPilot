@@ -36,7 +36,8 @@
     "eject": "react-scripts eject",
     "test:telegram": "jest telegram.test.js --config jest.config.js",
     "test:telegram:integration": "jest telegram.integration.test.js --config jest.config.js --runInBand",
-    "test:telegram:all": "jest telegram.*.test.js --config jest.config.js --runInBand"
+    "test:telegram:all": "jest telegram.*.test.js --config jest.config.js --runInBand",
+    "migrate": "node scripts/run-migrations.js"
   },
   "eslintConfig": {
     "extends": [
