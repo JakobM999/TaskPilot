@@ -56,6 +56,7 @@ import {
 } from '@mui/icons-material';
 import { testSupabaseConnection } from '../services/testSupabase';
 import { verifySupabaseSchema } from '../services/verifySchema';
+import { useNotifications } from '../hooks/useNotifications';
 
 // Tab panel component to wrap content for each tab
 function TabPanel(props) {
@@ -445,6 +446,12 @@ function Settings() {
   const [isLoading, setIsLoading] = useState(false);
   const [showDatabaseDetails, setShowDatabaseDetails] = useState(false);
 
+  const { 
+    notificationsEnabled, 
+    notificationPermission, 
+    toggleNotifications 
+  } = useNotifications();
+
   // Load saved feature upgrades from localStorage on component mount
   useEffect(() => {
     const savedUpgrades = localStorage.getItem('taskpilot_feature_upgrades');
@@ -693,12 +700,17 @@ function Settings() {
                           <NotificationsIcon />
                         </ListItemIcon>
                         <ListItemText 
-                          primary="Email Notifications" 
-                          secondary="Receive task reminders via email"
+                          primary="Push Notifications" 
+                          secondary={
+                            notificationPermission === 'denied' 
+                              ? "Notifications are blocked. Please enable them in your browser settings."
+                              : "Get notified about upcoming tasks"
+                          }
                         />
                         <Switch
-                          checked={emailNotifications}
-                          onChange={(e) => setEmailNotifications(e.target.checked)}
+                          checked={notificationsEnabled}
+                          onChange={toggleNotifications}
+                          disabled={notificationPermission === 'denied'}
                         />
                       </ListItem>
 
@@ -707,12 +719,12 @@ function Settings() {
                           <NotificationsIcon />
                         </ListItemIcon>
                         <ListItemText 
-                          primary="Desktop Notifications" 
-                          secondary="Show notifications on your desktop"
+                          primary="Email Notifications" 
+                          secondary="Receive task reminders via email"
                         />
                         <Switch
-                          checked={desktopNotifications}
-                          onChange={(e) => setDesktopNotifications(e.target.checked)}
+                          checked={emailNotifications}
+                          onChange={(e) => setEmailNotifications(e.target.checked)}
                         />
                       </ListItem>
 
@@ -729,8 +741,11 @@ function Settings() {
                           value={reminderTime}
                           onChange={(e) => setReminderTime(Number(e.target.value))}
                           size="small"
-                          sx={{ width: 80 }}
-                          InputProps={{ inputProps: { min: 5, max: 60 } }}
+                          sx={{ width: { xs: 70, sm: 80 } }}
+                          InputProps={{ 
+                            inputProps: { min: 5, max: 60 },
+                            sx: { textAlign: 'center' }
+                          }}
                         />
                       </ListItem>
                     </List>

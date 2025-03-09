@@ -14,7 +14,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Supabase configuration is incomplete. Check your .env file.');
 }
 
-// Create options with session persistence and debugging
+// Create options with session persistence and real-time features
 const options = {
   auth: {
     autoRefreshToken: true,
@@ -27,6 +27,13 @@ const options = {
   },
   global: {
     headers: { 'Content-Type': 'application/json' }
+  },
+  realtime: {
+    enabled: true,
+    log: true,
+    params: {
+      eventsPerSecond: 10
+    }
   }
 };
 

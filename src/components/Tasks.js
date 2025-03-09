@@ -1,68 +1,68 @@
 import React, { useState, useEffect } from 'react';
+import supabase from '../services/supabaseClient';
 import { 
   Box, 
   Grid, 
   Typography, 
   Paper, 
-  AppBar, 
-  Toolbar, 
-  Button,
   useTheme,
-  Drawer,
+  IconButton,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
-  IconButton,
-  Tooltip
+  Divider,
+  styled,
+  Snackbar,
+  Button,
+  Chip
 } from '@mui/material';
-import { format } from 'date-fns';
-import { da } from 'date-fns/locale';
-import MenuIcon from '@mui/icons-material/Menu';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import SettingsIcon from '@mui/icons-material/Settings';
-import LogoutIcon from '@mui/icons-material/Logout';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import MuiAlert from '@mui/material/Alert';
+import {
+  SmartToy as SmartToyIcon,
+  Refresh as RefreshIcon,
+  AccessTime as AccessTimeIcon,
+  TipsAndUpdates as TipsAndUpdatesIcon,
+  Apps as AppsIcon,
+  CalendarMonth as CalendarIcon,
+  Settings as SettingsIcon,
+  Logout as LogoutIcon
+} from '@mui/icons-material';
 import TaskList from './TaskList';
 import Calendar from './Calendar';
 import AIAssistant from './AIAssistant';
 import Settings from './Settings';
-import { signOut } from '../services/index';
 import { getTasks, createTask, updateTask, deleteTask, toggleTaskCompletion, toggleTaskPin, toggleTaskEscalation, rescheduleTask } from '../services/index';
 import { analyzeTask, prioritizeTasks, getTaskManagementAdvice } from '../services/aiService';
 
-const drawerWidth = 240;
 
 function Tasks({ user, onLogout }) {
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [aiSuggestion, setAiSuggestion] = useState(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [currentTimeframe, setCurrentTimeframe] = useState('today');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('tasks');
   const [message, setMessage] = useState({ text: '', type: 'info', open: false });
   const theme = useTheme();
 
-  // Fetch tasks and initial AI advice
   useEffect(() => {
+    if (!user?.id) return;
     let mounted = true;
 
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const { data: taskData, error: taskError } = await getTasks(currentTimeframe);
+        const fetchedTasks = await getTasks(currentTimeframe);
         if (!mounted) return;
         
-        if (taskError) {
-          console.error('Error fetching tasks:', taskError);
+        if (fetchedTasks.error) {
+          console.error('Error fetching tasks:', fetchedTasks.error);
         } else {
-          setTasks(taskData || []);
+          console.log('Fetched tasks:', fetchedTasks);
+          setTasks(fetchedTasks.data || []);
           
           const { data: aiData } = await getTaskManagementAdvice();
-          if (!mounted) setAiSuggestion(aiData?.advice || "Let's help you stay focused and productive today.");
+          if (mounted) setAiSuggestion(aiData?.advice || "Let's help you stay focused and productive today.");
         }
       } catch (err) {
         console.error('Error in tasks view:', err);
@@ -75,27 +75,43 @@ function Tasks({ user, onLogout }) {
 
     fetchData();
 
+    // Set up real-time subscription to tasks table using Supabase's channel API
+    // This subscribes to all task changes (insert, update, delete) for the current user
+    // and automatically refreshes the task list when changes occur
+    const channel = supabase
+      .channel('task-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: `user_id=eq.${user?.id}`
+        },
+        (payload) => {
+          console.log('Real-time update:', payload);
+          const { eventType, new: newRecord, old: oldRecord } = payload;
+          
+          // Only refresh if the task belongs to the current user
+          if ((newRecord?.user_id === user?.id) || (oldRecord?.user_id === user?.id)) {
+            console.log('Task change detected for current user, refreshing data...');
+            fetchData();
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       mounted = false;
+      // Clean up subscription when component unmounts
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, [currentTimeframe]);
-
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      onLogout();
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
+  }, [currentTimeframe, user?.id]);
 
   const handleCreateTask = async (newTask) => {
     try {
-      // Check if we have the user object available
       if (!user) {
         console.error('User not authenticated when attempting to create task');
         return;
@@ -108,45 +124,67 @@ function Tasks({ user, onLogout }) {
       
       if (error) {
         console.error('Error creating task:', error);
-      } else {
-        console.log('Task created successfully:', data);
-        
-        // Refresh the tasks list to ensure database sync
-        const { data: refreshedTasks, error: refreshError } = await getTasks(currentTimeframe);
-        
-        if (refreshError) {
-          console.error('Error refreshing tasks after creation:', refreshError);
-          // Fall back to updating local state directly
-          setTasks([...tasks, data]);
-        } else {
-          console.log('Tasks refreshed successfully:', refreshedTasks);
-          setTasks(refreshedTasks || []);
-        }
+        return;
       }
+
+      // Always fetch fresh data after creating a task
+      const { data: refreshedTasks, error: refreshError } = await getTasks(currentTimeframe);
+      
+      if (refreshError) {
+        console.error('Error refreshing tasks after creation:', refreshError);
+        // If refresh fails, at least add the new task to the current list
+        setTasks(prevTasks => [...prevTasks, data]);
+      } else {
+        console.log('Tasks refreshed successfully:', refreshedTasks);
+        setTasks(refreshedTasks || []);
+      }
+
+      setMessage({
+        text: 'Task created successfully',
+        type: 'success',
+        open: true
+      });
     } catch (err) {
       console.error('Error creating task:', err);
+      setMessage({
+        text: 'Failed to create task',
+        type: 'error',
+        open: true
+      });
     }
   };
 
   const handleUpdateTask = async (task) => {
-    // Log the task being updated for debugging
     console.log('Updating task:', task);
     
     setIsLoading(true);
     try {
-      const { data, error } = await updateTask(task);
+      const { error } = await updateTask(task);
       
       if (error) {
         console.error('Error updating task:', error);
+        setMessage({
+          text: 'Failed to update task',
+          type: 'error',
+          open: true
+        });
         return;
       }
       
-      // Update the local state with the updated task
-      setTasks(prevTasks => 
-        prevTasks.map(t => t.id === data.id ? data : t)
-      );
+      // Always fetch fresh data after updating a task
+      const { data: refreshedTasks, error: refreshError } = await getTasks(currentTimeframe);
       
-      // Show success message
+      if (refreshError) {
+        console.error('Error refreshing tasks after update:', refreshError);
+        // If refresh fails, at least update the task in the current list
+        setTasks(prevTasks => 
+          prevTasks.map(t => t.id === task.id ? task : t)
+        );
+      } else {
+        console.log('Tasks refreshed successfully:', refreshedTasks);
+        setTasks(refreshedTasks || []);
+      }
+      
       setMessage({
         text: 'Task updated successfully',
         type: 'success',
@@ -171,13 +209,38 @@ function Tasks({ user, onLogout }) {
       
       if (error) {
         console.error('Error deleting task:', error);
-      } else {
-        console.log('Task deleted successfully');
-        // Update local state directly
-        setTasks(tasks.filter(task => task.id !== taskId));
+        setMessage({
+          text: 'Failed to delete task',
+          type: 'error',
+          open: true
+        });
+        return;
       }
+
+      // Always fetch fresh data after deleting a task
+      const { data: refreshedTasks, error: refreshError } = await getTasks(currentTimeframe);
+      
+      if (refreshError) {
+        console.error('Error refreshing tasks after deletion:', refreshError);
+        // If refresh fails, at least remove the task from the current list
+        setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+      } else {
+        console.log('Tasks refreshed successfully:', refreshedTasks);
+        setTasks(refreshedTasks || []);
+      }
+
+      setMessage({
+        text: 'Task deleted successfully',
+        type: 'success',
+        open: true
+      });
     } catch (err) {
       console.error('Error deleting task:', err);
+      setMessage({
+        text: 'Failed to delete task',
+        type: 'error',
+        open: true
+      });
     }
   };
 
@@ -188,15 +251,34 @@ function Tasks({ user, onLogout }) {
       
       if (error) {
         console.error('Error toggling task completion:', error);
-      } else {
-        console.log('Task completion toggled successfully:', data);
-        // Update local state directly with the returned task data
+        setMessage({
+          text: 'Failed to toggle task completion',
+          type: 'error',
+          open: true
+        });
+        return;
+      }
+
+      // Always fetch fresh data after toggling completion
+      const { data: refreshedTasks, error: refreshError } = await getTasks(currentTimeframe);
+      
+      if (refreshError) {
+        console.error('Error refreshing tasks after completion toggle:', refreshError);
+        // If refresh fails, at least update the task in the current list
         setTasks(prevTasks => prevTasks.map(task => 
           task.id === data.id ? data : task
         ));
+      } else {
+        console.log('Tasks refreshed successfully:', refreshedTasks);
+        setTasks(refreshedTasks || []);
       }
     } catch (err) {
       console.error('Error toggling task completion:', err);
+      setMessage({
+        text: 'Failed to toggle task completion',
+        type: 'error',
+        open: true
+      });
     }
   };
 
@@ -232,12 +314,40 @@ function Tasks({ user, onLogout }) {
       const { data, error } = await rescheduleTask(taskId);
       if (error) {
         console.error('Error rescheduling task:', error);
-      } else {
-        // Update local state directly with the returned task data
-        setTasks(tasks.map(task => task.id === data.id ? data : task));
+        setMessage({
+          text: 'Failed to reschedule task',
+          type: 'error',
+          open: true
+        });
+        return;
       }
+
+      // Always fetch fresh data after rescheduling
+      const { data: refreshedTasks, error: refreshError } = await getTasks(currentTimeframe);
+      
+      if (refreshError) {
+        console.error('Error refreshing tasks after rescheduling:', refreshError);
+        // If refresh fails, at least update the task in the current list
+        setTasks(prevTasks => prevTasks.map(task => 
+          task.id === data.id ? data : task
+        ));
+      } else {
+        console.log('Tasks refreshed successfully:', refreshedTasks);
+        setTasks(refreshedTasks || []);
+      }
+
+      setMessage({
+        text: 'Task rescheduled successfully',
+        type: 'success',
+        open: true
+      });
     } catch (err) {
       console.error('Error rescheduling task:', err);
+      setMessage({
+        text: 'Failed to reschedule task',
+        type: 'error',
+        open: true
+      });
     }
   };
 
@@ -246,14 +356,34 @@ function Tasks({ user, onLogout }) {
       const { data, error } = await toggleTaskPin(taskId);
       if (error) {
         console.error('Error toggling task pin:', error);
-      } else {
-        // Update local state with the pinned status
-        setTasks(tasks.map(task => 
+        setMessage({
+          text: 'Failed to toggle pin status',
+          type: 'error',
+          open: true
+        });
+        return;
+      }
+
+      // Always fetch fresh data after toggling pin
+      const { data: refreshedTasks, error: refreshError } = await getTasks(currentTimeframe);
+      
+      if (refreshError) {
+        console.error('Error refreshing tasks after pin toggle:', refreshError);
+        // If refresh fails, at least update the task in the current list
+        setTasks(prevTasks => prevTasks.map(task => 
           task.id === taskId ? { ...task, pinned: data.pinned } : task
         ));
+      } else {
+        console.log('Tasks refreshed successfully:', refreshedTasks);
+        setTasks(refreshedTasks || []);
       }
     } catch (err) {
       console.error('Error toggling task pin:', err);
+      setMessage({
+        text: 'Failed to toggle pin status',
+        type: 'error',
+        open: true
+      });
     }
   };
 
@@ -262,87 +392,36 @@ function Tasks({ user, onLogout }) {
       const { data, error } = await toggleTaskEscalation(taskId);
       if (error) {
         console.error('Error toggling task escalation:', error);
-      } else {
-        // Update local state with the escalated status
-        setTasks(tasks.map(task => 
+        setMessage({
+          text: 'Failed to toggle escalation',
+          type: 'error',
+          open: true
+        });
+        return;
+      }
+
+      // Always fetch fresh data after toggling escalation
+      const { data: refreshedTasks, error: refreshError } = await getTasks(currentTimeframe);
+      
+      if (refreshError) {
+        console.error('Error refreshing tasks after escalation toggle:', refreshError);
+        // If refresh fails, at least update the task in the current list
+        setTasks(prevTasks => prevTasks.map(task => 
           task.id === taskId ? { ...task, escalated: data.escalated } : task
         ));
+      } else {
+        console.log('Tasks refreshed successfully:', refreshedTasks);
+        setTasks(refreshedTasks || []);
       }
     } catch (err) {
       console.error('Error toggling task escalation:', err);
+      setMessage({
+        text: 'Failed to toggle escalation',
+        type: 'error',
+        open: true
+      });
     }
   };
-
-  const handleSidebarCollapse = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
-
-  const drawer = (
-    <Box>
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        px: 2,
-        py: 1 
-      }}>
-        {!sidebarCollapsed && (
-          <Typography variant="h6" component="div" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-            TaskPilot
-          </Typography>
-        )}
-        <IconButton onClick={handleSidebarCollapse}>
-          {sidebarCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
-        </IconButton>
-      </Box>
-      <List>
-        <ListItem 
-          button 
-          onClick={() => setActiveTab('tasks')}
-          selected={activeTab === 'tasks'}
-        >
-          <ListItemIcon>
-            <Tooltip title="Tasks" placement="right">
-              <DashboardIcon />
-            </Tooltip>
-          </ListItemIcon>
-          {!sidebarCollapsed && <ListItemText primary="Tasks" />}
-        </ListItem>
-        <ListItem 
-          button 
-          onClick={() => setActiveTab('calendar')}
-          selected={activeTab === 'calendar'}
-        >
-          <ListItemIcon>
-            <Tooltip title="Calendar" placement="right">
-              <CalendarMonthIcon />
-            </Tooltip>
-          </ListItemIcon>
-          {!sidebarCollapsed && <ListItemText primary="Calendar" />}
-        </ListItem>
-        <ListItem 
-          button 
-          onClick={() => setActiveTab('settings')}
-          selected={activeTab === 'settings'}
-        >
-          <ListItemIcon>
-            <Tooltip title="Settings" placement="right">
-              <SettingsIcon />
-            </Tooltip>
-          </ListItemIcon>
-          {!sidebarCollapsed && <ListItemText primary="Settings" />}
-        </ListItem>
-        <ListItem button onClick={handleSignOut}>
-          <ListItemIcon>
-            <Tooltip title="Sign Out" placement="right">
-              <LogoutIcon />
-            </Tooltip>
-          </ListItemIcon>
-          {!sidebarCollapsed && <ListItemText primary="Sign Out" />}
-        </ListItem>
-      </List>
-    </Box>
-  );
 
   const renderContent = () => {
     switch (activeTab) {
@@ -356,7 +435,35 @@ function Tasks({ user, onLogout }) {
               <Grid item xs={12} lg={8}>
                 <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
                   <Calendar 
-                    tasks={tasks}
+                    tasks={tasks.filter(task => {
+                      const taskDate = new Date(task.dueDate);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const isOverdue = taskDate < today;
+
+                      switch(currentTimeframe) {
+                        case 'today':
+                          return taskDate.getTime() === today.getTime() || isOverdue;
+                        case 'tomorrow':
+                          const tomorrow = new Date(today);
+                          tomorrow.setDate(tomorrow.getDate() + 1);
+                          return taskDate.getTime() === tomorrow.getTime();
+                        case 'week':
+                          const weekEnd = new Date(today);
+                          weekEnd.setDate(weekEnd.getDate() + 7);
+                          return taskDate >= today && taskDate <= weekEnd;
+                        case 'month':
+                          const monthEnd = new Date(today);
+                          monthEnd.setDate(monthEnd.getDate() + 30);
+                          return taskDate >= today && taskDate <= monthEnd;
+                        case 'upcoming':
+                          return taskDate >= today;
+                        case 'overdue':
+                          return isOverdue;
+                        default:
+                          return true;
+                      }
+                    })}
                     onToggleComplete={handleToggleComplete}
                     onTogglePin={handleTogglePin}
                     isLoading={isLoading}
@@ -389,7 +496,7 @@ function Tasks({ user, onLogout }) {
         return (
           <Box sx={{ p: 3 }}>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={7} lg={8}>
+              <Grid item xs={12} md={8}>
                 <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
                   <TaskList 
                     tasks={tasks}
@@ -407,7 +514,7 @@ function Tasks({ user, onLogout }) {
                   />
                 </Paper>
               </Grid>
-              <Grid item xs={12} md={5} lg={4}>
+              <Grid item xs={12} md={4}>
                 <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
                   <AIAssistant 
                     suggestion={aiSuggestion}
@@ -427,93 +534,38 @@ function Tasks({ user, onLogout }) {
   };
 
   return (
-    <Box sx={{ display: 'flex' }}>
-      <AppBar 
-        position="fixed" 
-        sx={{ 
-          width: { sm: `calc(100% - ${sidebarCollapsed ? 56 : drawerWidth}px)` },
-          ml: { sm: sidebarCollapsed ? 56 : drawerWidth },
-          zIndex: theme.zIndex.drawer + 1,
-        }}
-      >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+    <Box>
+      {/* Alert component */}
+      {React.useMemo(() => {
+        const Alert = React.forwardRef(function Alert(props, ref) {
+          return (
+            <MuiAlert
+              elevation={6}
+              variant="filled"
+              ref={ref}
+              {...props}
+            />
+          );
+        });
+
+        return (
+          <Snackbar
+            open={message.open}
+            autoHideDuration={3000}
+            onClose={() => setMessage(prev => ({ ...prev, open: false }))}
           >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            {format(new Date(), 'EEEE, d. MMMM yyyy', { locale: da })}
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="subtitle1" sx={{ display: { xs: 'none', sm: 'block' } }}>
-              Welcome, {user?.user_metadata?.full_name || user?.email || 'User'}
-            </Typography>
-            <Button color="inherit" onClick={handleSignOut} startIcon={<LogoutIcon />}>
-              Sign Out
-            </Button>
-          </Box>
-        </Toolbar>
-      </AppBar>
-      
-      <Drawer
-        variant="temporary"
-        open={mobileOpen}
-        onClose={handleDrawerToggle}
-        ModalProps={{ keepMounted: true }}
-        sx={{
-          display: { xs: 'block', sm: 'none' },
-          '& .MuiDrawer-paper': { 
-            boxSizing: 'border-box', 
-            width: drawerWidth,
-          },
-        }}
-      >
-        {drawer}
-      </Drawer>
-      
-      <Drawer
-        variant="permanent"
-        sx={{
-          display: { xs: 'none', sm: 'block' },
-          '& .MuiDrawer-paper': { 
-            boxSizing: 'border-box',
-            width: sidebarCollapsed ? 56 : drawerWidth,
-            transition: theme.transitions.create('width', {
-              easing: theme.transitions.easing.sharp,
-              duration: theme.transitions.duration.enteringScreen,
-            }),
-            overflowX: 'hidden',
-          },
-        }}
-        open
-      >
-        {drawer}
-      </Drawer>
-      
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          p: 3,
-          width: '100%',
-          mt: 8,
-          transition: theme.transitions.create('margin', {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-          }),
-          marginLeft: {
-            xs: 0,
-            sm: sidebarCollapsed ? '56px' : `${drawerWidth}px`
-          }
-        }}
-      >
-        {renderContent()}
-      </Box>
+            <Alert
+              onClose={() => setMessage(prev => ({ ...prev, open: false }))}
+              severity={message.type}
+              sx={{ width: '100%' }}
+            >
+              {message.text}
+            </Alert>
+          </Snackbar>
+        );
+      }, [message])}
+
+      {renderContent()}
     </Box>
   );
 }

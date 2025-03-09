@@ -356,7 +356,14 @@ function TaskList({
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h5" component="h2">Your Tasks</Typography>
+        <Box>
+          <Typography variant="h5" component="h2">Your Tasks</Typography>
+          {taskSummary && (
+            <Typography variant="body2" color="text.secondary">
+              {taskSummary.high} high priority • {taskSummary.escalated} escalated
+            </Typography>
+          )}
+        </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <FormControl size="small">
             <Select

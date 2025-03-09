@@ -13,18 +13,13 @@ export const getTasks = async (timeframe = 'today') => {
       throw new Error('User must be authenticated to get tasks');
     }
 
-    // Get current date in Danish local time
+    // Get current date in local time
     const now = new Date();
     // Set to noon in local time to avoid any DST issues
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
     const todayStr = today.toISOString().split('T')[0];
 
-    console.log('Date debugging:', {
-      localNow: now.toLocaleString('da-DK'),
-      localToday: today.toLocaleString('da-DK'),
-      todayStr,
-      timeframe
-    });
+    console.log('Getting tasks:', { timeframe, userId: user.id });
 
     // First, get all overdue tasks
     const { data: overdueTasks, error: overdueError } = await supabase
@@ -38,7 +33,7 @@ export const getTasks = async (timeframe = 'today') => {
         list_items(*)
       `)
       .eq('user_id', user.id)
-      .lt('due_date::date', todayStr)
+      .lt('due_date', todayStr)
       .eq('completed', false)
       .order('due_date', { ascending: true });
 
@@ -58,20 +53,23 @@ export const getTasks = async (timeframe = 'today') => {
         ),
         list_items(*)
       `)
-      .eq('user_id', user.id)
-      .eq('completed', false);  // Only get uncompleted tasks
+      .eq('user_id', user.id);
 
     // Apply timeframe filters
     switch (timeframe) {
       case 'today':
-        query = query.eq('due_date::date', todayStr);
+        query = query
+          .gte('due_date', todayStr)
+          .lt('due_date', new Date(today.getTime() + 24*60*60*1000).toISOString().split('T')[0]);
         break;
       
       case 'tomorrow':
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
         const tomorrowStr = tomorrow.toISOString().split('T')[0];
-        query = query.eq('due_date::date', tomorrowStr);
+        query = query
+          .gte('due_date', tomorrowStr)
+          .lt('due_date', new Date(tomorrow.getTime() + 24*60*60*1000).toISOString().split('T')[0]);
         break;
       
       case 'week':
@@ -79,8 +77,8 @@ export const getTasks = async (timeframe = 'today') => {
         weekEnd.setDate(weekEnd.getDate() + 7);
         const weekEndStr = weekEnd.toISOString().split('T')[0];
         query = query
-          .gte('due_date::date', todayStr)
-          .lte('due_date::date', weekEndStr);
+          .gte('due_date', todayStr)
+          .lt('due_date', weekEndStr);
         break;
       
       case 'month':
@@ -88,12 +86,12 @@ export const getTasks = async (timeframe = 'today') => {
         monthEnd.setDate(monthEnd.getDate() + 30);
         const monthEndStr = monthEnd.toISOString().split('T')[0];
         query = query
-          .gte('due_date::date', todayStr)
-          .lte('due_date::date', monthEndStr);
+          .gte('due_date', todayStr)
+          .lt('due_date', monthEndStr);
         break;
       
       case 'upcoming':
-        query = query.gte('due_date::date', todayStr);
+        query = query.gte('due_date', todayStr);
         break;
       
       case 'overdue':
@@ -104,7 +102,9 @@ export const getTasks = async (timeframe = 'today') => {
         };
       
       default:
-        query = query.eq('due_date::date', todayStr);
+        query = query
+          .gte('due_date', todayStr)
+          .lt('due_date', new Date(today.getTime() + 24*60*60*1000).toISOString().split('T')[0]);
     }
 
     // Get the timeframe-specific tasks
@@ -120,7 +120,7 @@ export const getTasks = async (timeframe = 'today') => {
     const allTaskIds = new Set();
     const combinedTasks = [];
 
-    // Add overdue tasks first for today, tomorrow, week and month views
+    // Add overdue tasks first for relevant views
     if (['today', 'tomorrow', 'week', 'month'].includes(timeframe)) {
       overdueTasks?.forEach(task => {
         if (!allTaskIds.has(task.id)) {
@@ -136,6 +136,13 @@ export const getTasks = async (timeframe = 'today') => {
         allTaskIds.add(task.id);
         combinedTasks.push(task);
       }
+    });
+
+    console.log('Tasks retrieved:', { 
+      timeframe, 
+      overdueTasks: overdueTasks?.length || 0,
+      timeframeTasks: timeframeTasks?.length || 0,
+      combinedTasks: combinedTasks.length 
     });
 
     // Format tasks for frontend
@@ -240,7 +247,6 @@ export const createTag = async (tagName, color = '#1976D2') => {
 };
 
 // Helper function to check if a task was completed today
-// eslint-disable-next-line no-unused-vars
 const isCompletedToday = (completedAt) => {
   if (!completedAt) return false;
   const completedDate = new Date(completedAt);
